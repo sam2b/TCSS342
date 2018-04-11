@@ -1,14 +1,16 @@
 /*
  * lc3.c
  *
- *  Date Due: Apr 8, 2018
- *  Authors:  Sam Brendel, and Samantha Anderson
- *  version: 408d
+ *  Date Due: Apr 22, 2018
+ *  Authors:  Sam Brendel, other
+ *  Problem 3,4
+ *  version: 4.10
  */
 
 #include "lc3.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 
 #define FETCH     0
 #define DECODE    1
@@ -45,12 +47,8 @@
 #define CONDITION_NZP      7 // 0000 0110 0000 0000
 
 
-unsigned short memory[32]; // 32 words of memory enough to store simple program
-unsigned short reg[8];
-unsigned short op1;
-unsigned short op2;
-unsigned short result;
-char brCC[3];
+unsigned short memory[100]; // 32 words of memory enough to store simple program
+bool isTrap = false;
 
 //***Simulates trap table lookup for now***
 void trap(unsigned short vector, CPU_p cpu)
@@ -60,8 +58,8 @@ void trap(unsigned short vector, CPU_p cpu)
     case 0x25:
         displayCPU(cpu);
         printf("==========HALT==========\n");
-        //exit(0);
-        
+        isTrap = true;
+        break;
     default: 
         printf("Err: Unknown Trap vector?\n");
         break;
@@ -255,8 +253,9 @@ int controller(CPU_p cpu) {
             break;
         } // end switch (state)
 
-        if ((state == FETCH))
-            break;
+        //if (state == FETCH)
+        if (isTrap)
+           break;
 
     } // end for()
     displayCPU(cpu);

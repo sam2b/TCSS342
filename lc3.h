@@ -1,9 +1,10 @@
 /*
  * lc3.h
  *
- *  Date Due: Apr 8, 2018
- *  Authors:  Sam Brendel, and Samantha Anderson
- *  version: 408d
+ *  Date Due: Apr 22, 2018
+ *  Authors:  Sam Brendel, other
+ *  Problem 3,4
+ *  version: 4.10
  */
 
 #ifndef LC3_H_
