@@ -4,7 +4,7 @@
  *  Date Due: Apr 22, 2018
  *  Authors:  Sam Brendel, other
  *  Problem 3,4
- *  version: 4.10
+ *  version: 4.10c
  */
 
 #ifndef LC3_H_
@@ -17,6 +17,8 @@ struct CPUType {
 	unsigned short int ir;     // instruction register.
 	unsigned short mar;        // memory address register.
 	unsigned short mdr;        // memory data register.
+	unsigned short A;
+	unsigned short B;
 };
 
 typedef struct CPUType CPU_p;
@@ -29,5 +31,6 @@ unsigned short ZEXT(unsigned short);
 unsigned short SEXT(unsigned short);
 void TRAP(unsigned short, CPU_p);
 unsigned short getConditionCode(unsigned short);
+void displayHeader();
 
 #endif /* LC3_H_ */

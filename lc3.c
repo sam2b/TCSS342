@@ -4,7 +4,7 @@
  *  Date Due: Apr 22, 2018
  *  Authors:  Sam Brendel, other
  *  Problem 3,4
- *  version: 4.10
+ *  version: 4.10c
  */
 
 #include "lc3.h"
@@ -51,27 +51,15 @@ unsigned short memory[100]; // 32 words of memory enough to store simple program
 bool isTrap = false;
 
 //***Simulates trap table lookup for now***
-void trap(unsigned short vector, CPU_p cpu)
-{
-    switch (vector)
-    {
+void trap(unsigned short vector, CPU_p cpu) {
+    switch (vector) {
     case 0x25:
-        displayCPU(cpu);
         printf("==========HALT==========\n");
         isTrap = true;
         break;
     default: 
         printf("Err: Unknown Trap vector?\n");
         break;
-    }
-}
-
-void displayMem(CPU_p cpu)
-{
-    printf("\nMemory:\n");
-    int j;
-    for(j=0; j<32; j++) {
-        printf("%2u  %#x \n", j, memory[j]);
     }
 }
 
@@ -130,7 +118,7 @@ int controller(CPU_p cpu) {
             state = FETCH_OP;
             break;
 
-        case FETCH_OP: // sam B.
+        case FETCH_OP:
             switch (opcode) {
                 // get operands out of registers into A, B of ALU
                 // or get memory for load instr.
@@ -228,7 +216,7 @@ int controller(CPU_p cpu) {
             state = STORE;
             break;
 
-        case STORE: // Look at ST. Microstate 16 is the store to memory //Sam B.
+        case STORE: // Look at ST. Microstate 16 is the store to memory
             switch (opcode) {
             // write back to register or store MDR into memory
             case OP_ADD:
@@ -258,8 +246,11 @@ int controller(CPU_p cpu) {
            break;
 
     } // end for()
-    displayCPU(cpu);
-    displayMem(cpu);
+
+    if (isTrap) {
+        displayCPU(cpu);
+    }
+
     return 0;
 } // end controller()
 
@@ -298,19 +289,50 @@ unsigned short ZEXT(unsigned short value) {
     return value;
 }
 
+
+void displayHeader() {
+    printf("Welcome to the LC-3 Simulator Simulator\n");
+}
+
 /**
  * Print out fields to the console for the CPU_p object.
  */
 void displayCPU(CPU_p cpu) {
-    int i;
-    printf("Registers: ");
-    for (i=0; i<8; i++) {
-        printf("R%d=%x   ", i, memory[i+24]);
-    }
-    printf("\nPC=%#x   cc=%#x   ir=%#x   mar=%#x   mdr=%#x\n", cpu.PC, cpu.cc, cpu.ir,
-            cpu.mar, cpu.mdr);
+    displayHeader();
+    printf("Registers                     Memory\n");
 
-    
+    // First 8 lines
+    int i = 0;
+    for(i = 0; i < 8; i++) {
+        printf("R%u: %#.4x", i, memory[cpu.reg[i]]);   // Registers.
+        printf("%#26x: %#.4x\n", i+0x3000, memory[i]); // Memory.
+    }
+
+    // Next 3 lines
+    int j;
+    for (j = 0; j < 3; j++ & i++) {
+        printf("%#36x: %#.4x\n", i+0x3000, memory[i]);
+    }
+
+    // Next 4 lines.
+    printf("PC:  %#.4x    IR: %#.4x     %#.4x: %#.4x\n", cpu.PC, cpu.ir, i+0x3000, memory[i]);
+    printf("A:   %#.4x       B: %#.4x       %#.4x: %#.4x\n", cpu.A, cpu.B, i+0x3000, memory[i++]);
+    printf("MAR: %#.4x   MDR: %#.4x     %#.4x: %#.4x\n", cpu.PC, cpu.ir, i+0x3000, memory[i++]);
+    printf("CC:  N:%d Z:%d P:%d              %#.4x: %#.4x\n", cpu.cc >> 2 & 7, cpu.cc >> 1 & 5, cpu.cc & 1, i+0x3000, memory[i++]);
+
+    // Last 2 lines.
+    printf("%#36x: %#.4x\n", i+0x3000, memory[i++]);
+    printf("Select: 1) Load,  3) Step,  5) Display Mem,  9) Exit\n");
+
+
+
+
+//    int i;
+//    //printf("Registers: ");
+//    for (i=0; i<8; i++) {
+//        printf("R%d=%x   ", i, memory[i+24]);
+//    }
+//    printf("\nPC=%#x   cc=%#x   ir=%#x   mar=%#x   mdr=%#x\n", cpu.PC, cpu.cc, cpu.ir, cpu.mar, cpu.mdr);
 }
 
 /**
@@ -330,16 +352,13 @@ void zeroOut(unsigned short *array, int quantity) {
 CPU_p initialize() {
     CPU_p cpu = { 0    // PC
                 , 0    // cc
-                , { 24, 25, 26, 27, 28, 29, 30, 31 } // The last 8 elements of the memory[] array.
+                , { 92, 93, 94, 95, 96, 97, 98, 99 } // The last 8 elements of the memory[] array.
                 , 0    // ir
                 , 0    // mar
                 , 0 }; // mdr
 
-    zeroOut(memory, 32);
-    int i = 0;
-    
-    for (; i < 24; i++)
-    {
+    int i;
+    for (i = 0; i < 100; i++) {
         memory[i] = i;
     }
 
