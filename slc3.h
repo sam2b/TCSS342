@@ -1,14 +1,14 @@
 /*
- * lc3.h
+ *  slc3.h
  *
  *  Date Due: Apr 22, 2018
- *  Authors:  Sam Brendel, other
+ *  Authors:  Sam Brendel, Tyler Richard Shupack
  *  Problem 3,4
- *  version: 4.10c
+ *  version: 4.11a
  */
 
-#ifndef LC3_H_
-#define LC3_H_
+#ifndef SLC3_H_
+#define SLC3_H_
 
 struct CPUType {
 	unsigned short int PC;     // program counter.
@@ -33,4 +33,4 @@ void TRAP(unsigned short, CPU_p);
 unsigned short getConditionCode(unsigned short);
 void displayHeader();
 
-#endif /* LC3_H_ */
+#endif /* SLC3_H_ */

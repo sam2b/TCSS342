@@ -1,13 +1,13 @@
 /*
- * lc3.c
+ *  slc3.c
  *
  *  Date Due: Apr 22, 2018
- *  Authors:  Sam Brendel, other
+ *  Authors:  Sam Brendel, Tyler Richard Shupack
  *  Problem 3,4
- *  version: 4.10c
+ *  version: 4.11a
  */
 
-#include "lc3.h"
+#include "slc3.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
