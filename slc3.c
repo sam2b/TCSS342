@@ -4,19 +4,24 @@
  *  Date Due: Apr 22, 2018
  *  Authors:  Sam Brendel, Tyler Shupack
  *  Problem 3,4
- *  version: 4.11a
+ *  version: 4.13a
  */
 
 #include "slc3.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <stdio.h>
 
-
-unsigned short memory[100]; // 32 words of memory enough to store simple program
+unsigned short memory[100];
 bool isTrap = false;
 
-//***Simulates trap table lookup for now***
+/**
+ * Simulates trap table lookup for now
+ * @param vector the area in memory that is simulated to be looked up to
+ *        execute the requested TRAP routine.
+ * @param cpu the cpu object that contains data.
+ */
 void trap(unsigned short vector, CPU_p cpu) {
     switch (vector) {
     case 0x25:
@@ -29,6 +34,10 @@ void trap(unsigned short vector, CPU_p cpu) {
     }
 }
 
+/**
+ * The controller component of the LC-3 simulator.
+ * @param cpu the cpu object to contain data.
+ */
 int controller(CPU_p cpu) {
 
     // check to make sure both pointers are not NULL
@@ -220,6 +229,11 @@ int controller(CPU_p cpu) {
     return 0;
 } // end controller()
 
+/**
+ * Gets the condition code of the resulting computer value.
+ * @param value the value that was recently computed.
+ * @return the condition code that represents the 3bit NZP as binary.
+ */
 unsigned short getConditionCode(unsigned short value) {
     unsigned short code;
 
@@ -241,30 +255,37 @@ unsigned short getConditionCode(unsigned short value) {
     return code;
 }
 
+/**
+ * Sets the PC to the designated index in memory[].
+ * @param cpu the cpu object containing data.
+ * @param whereTo the address where to go to.
+ */
 void JUMP(CPU_p *cpu, unsigned short whereTo) {
     cpu->PC = whereTo;
 }
 
+/**
+ * Simulating a SEXT operation.
+ */
 unsigned short SEXT(unsigned short value) {
     // Simulated SEXT.
     return value;
 }
 
+/**
+ * Simulating a ZEXT operation.
+ */
 unsigned short ZEXT(unsigned short value) {
     // Simulated ZEXT.
     return value;
 }
 
-
-void displayHeader() {
-    printf("Welcome to the LC-3 Simulator Simulator\n");
-}
-
 /**
  * Print out fields to the console for the CPU_p object.
+ * @param cpu the cpu object containing the data.
  */
 void displayCPU(CPU_p cpu) {
-    displayHeader();
+    printf("Welcome to the LC-3 Simulator Simulator\n");
     printf("Registers                     Memory\n");
 
     // First 8 lines
@@ -324,24 +345,63 @@ CPU_p initialize() {
                 , 0 }; // mdr
 
     int i;
-    for (i = 0; i < 100; i++) {
+
+    /*for (i = 0; i < 100; i++) {
         memory[i] = i;
-    }
+    }*/
+    zeroOut(memory, 100);
 
     // Intentionally hard coding these values into two memory registers.
-    memory[cpu.reg[1]] = 3;
-    memory[cpu.reg[2]] = 4;
-    memory[cpu.reg[3]] = 0xB0B0;   // Intentional simulated data.
-    memory[4] = 0xA0A0;            // Intentional simulated data.
-    memory[cpu.reg[0]] = 0xD0E0;     // Intentional simulated data.
+    //memory[cpu.reg[1]] = 3;
+    //memory[cpu.reg[2]] = 4;
+    //memory[cpu.reg[3]] = 0xB0B0;   // Intentional simulated data.
+    //memory[4] = 0xA0A0;            // Intentional simulated data.
+    //memory[cpu.reg[0]] = 0xD0E0;     // Intentional simulated data.
     return cpu;
+}
+
+/**
+ * Opens a text file in read only mode.
+ * @param theFileName the file name to open, in this present working directory.
+ * @return the pointer to the file now opened.
+ */
+FILE* openFileText(char *theFileName) {
+    FILE *dataFile;
+    if ((dataFile = fopen(theFileName, "r")) == NULL) {
+        printf("---ERROR, File %s could not be opened.\n", theFileName);
+    }
+    return dataFile;
+}
+
+/**
+ * Loads the the instructions from the text file into memory[].
+ * Expects one instruction per line, in hex number form, and a new line character.
+ * @param inputFile the file to read.
+ */
+void loadProgramInstructions(FILE *inputFile) {
+        char instruction [4]; // includes room for the null terminating character.
+        int length = sizeof(instruction);
+        int i = 0;
+        while(!feof(inputFile)) {
+            fgets(instruction, length, inputFile);
+            memory[i++] = strtol(instruction, NULL, 16);
+            fgets(instruction, length, inputFile); // FIXME: hackaround for getting a zero instead of the next line.
+        }
+        fclose(inputFile);
+
+        /*printf("TESTING, DELETE ME.\n");
+        int j;
+        for(j=0; j<31; j++) {
+            printf("%.4x\n", memory[j]);
+        }*/
 }
 
 /**
  * Driver for the program.
  */
 int main(int argc, char* argv[]) {
+    char *fileName = argv[1];
     CPU_p cpu = initialize();
-    memory[0] = strtol(argv[1], NULL, 16);
+    loadProgramInstructions(openFileText(fileName)); // TODO: only invoke this function via the Load menu option.
     controller(cpu);
 }
