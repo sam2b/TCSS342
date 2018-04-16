@@ -6,6 +6,7 @@
  *  Problem 3,4
  *  version: 4.11a
  */
+#include <stdio.h>
 
 #ifndef SLC3_H_
 #define SLC3_H_
@@ -66,5 +67,7 @@ unsigned short SEXT(unsigned short);
 void TRAP(unsigned short, CPU_p);
 unsigned short getConditionCode(unsigned short);
 void displayHeader();
+FILE* openFileText(char *);
+void loadProgramInstructions(FILE *);
 
 #endif /* SLC3_H_ */

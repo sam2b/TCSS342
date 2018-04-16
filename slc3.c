@@ -4,7 +4,7 @@
  *  Date Due: Apr 22, 2018
  *  Authors:  Sam Brendel, Tyler Shupack
  *  Problem 3,4
- *  version: 4.13a
+ *  version: 4.16a
  */
 
 #include "slc3.h"
@@ -12,6 +12,7 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <ncurses.h>
 
 unsigned short memory[100];
 bool isTrap = false;
@@ -43,8 +44,7 @@ int controller(CPU_p cpu) {
     // check to make sure both pointers are not NULL
     // do any initializations here
     unsigned int opcode, dr, sr1, sr2, bit5, immed, offset, state, condition;    // fields for the IR
-    unsigned short vector8; //uint8_t vector8;
-    unsigned short vector16;
+    unsigned short vector8, vector16;
 
     state = FETCH;
     for (;;) { // efficient endless loop to be used in the next problem
@@ -216,16 +216,14 @@ int controller(CPU_p cpu) {
             break;
         } // end switch (state)
 
-        //if (state == FETCH)
-        if (isTrap)
+        if (isTrap) {
            break;
-
+        } else {
+            displayCPU(cpu); // refreshes the screen and prompts the user again.
+        }
     } // end for()
 
-    if (isTrap) {
-        displayCPU(cpu);
-    }
-
+    //displayCPU(cpu);
     return 0;
 } // end controller()
 
@@ -285,41 +283,62 @@ unsigned short ZEXT(unsigned short value) {
  * @param cpu the cpu object containing the data.
  */
 void displayCPU(CPU_p cpu) {
+    short menuSelection = 0;
+    char *fileName[200];
     printf("Welcome to the LC-3 Simulator Simulator\n");
     printf("Registers                     Memory\n");
 
     // First 8 lines
     int i = 0;
     for(i = 0; i < 8; i++) {
-        printf("R%u: %#.4x", i, memory[cpu.reg[i]]);   // Registers.
-        printf("%#26x: %#.4x\n", i+0x3000, memory[i]); // Memory.
+        printf("R%u: %4X", i, memory[cpu.reg[i]]);   // Registers.
+        printf("%26X: %4X\n", i+0x3000, memory[i]); // Memory.
     }
 
     // Next 3 lines
     int j;
     for (j = 0; j < 3; j++ & i++) {
-        printf("%#36x: %#.4x\n", i+0x3000, memory[i]);
+        printf("%34X: %4X\n", i+0x3000, memory[i]);
     }
 
     // Next 4 lines.
-    printf("PC:  %#.4x    IR: %#.4x     %#.4x: %#.4x\n", cpu.PC, cpu.ir, i+0x3000, memory[i]);
-    printf("A:   %#.4x       B: %#.4x       %#.4x: %#.4x\n", cpu.A, cpu.B, i+0x3000, memory[i++]);
-    printf("MAR: %#.4x   MDR: %#.4x     %#.4x: %#.4x\n", cpu.PC, cpu.ir, i+0x3000, memory[i++]);
-    printf("CC:  N:%d Z:%d P:%d              %#.4x: %#.4x\n", cpu.cc >> 2 & 7, cpu.cc >> 1 & 5, cpu.cc & 1, i+0x3000, memory[i++]);
+    printf("PC:  %4X    IR: %4X       %4X: %4X\n", cpu.PC, cpu.ir, i+0x3000, memory[i]);
+    printf("A:   %4X     B: %4X       %4X: %4X\n", cpu.A, cpu.B, i+0x3000, memory[i++]);
+    printf("MAR: %4X   MDR: %4X       %4X: %4X\n", cpu.PC, cpu.ir, i+0x3000, memory[i++]);
+    printf("CC:  N:%d Z:%d P:%d            %4X: %4X\n", cpu.cc >> 2 & 7, cpu.cc >> 1 & 5, cpu.cc & 1, i+0x3000, memory[i++]);
 
     // Last 2 lines.
-    printf("%#36x: %#.4x\n", i+0x3000, memory[i++]);
+    printf("%34X: %4X\n", i+0x3000, memory[i++]);
     printf("Select: 1) Load,  3) Step,  5) Display Mem,  9) Exit\n");
-
-
-
-
-//    int i;
-//    //printf("Registers: ");
-//    for (i=0; i<8; i++) {
-//        printf("R%d=%x   ", i, memory[i+24]);
-//    }
-//    printf("\nPC=%#x   cc=%#x   ir=%#x   mar=%#x   mdr=%#x\n", cpu.PC, cpu.cc, cpu.ir, cpu.mar, cpu.mdr);
+    fflush( stdout );
+    scanf("%d", &menuSelection);
+    switch(menuSelection) {
+    case 1:
+        printf("Specify file name: ");
+        fflush(stdout);
+        scanf("%s", fileName);
+        loadProgramInstructions(openFileText(fileName));
+        controller(cpu);
+        break;
+    case 3:
+        printf(" "); // do nothing.  Just let the PC run the next instruction.
+        controller(cpu);
+        break;
+    case 5:
+        printf(" "); // Update the window for the memory registers.
+        break;
+    case 9:
+        printf(" ");
+        //memory[cpu.PC] = 0xF025; // TRAP x25
+        printf("\nBubye\n");
+        exit(0);
+        break;
+    default:
+        printf(" Invalid selection\n.");
+        displayCPU(cpu);
+        break;
+    }
+    fflush(stdout);
 }
 
 /**
@@ -344,9 +363,8 @@ CPU_p initialize() {
                 , 0    // mar
                 , 0 }; // mdr
 
-    int i;
-
-    /*for (i = 0; i < 100; i++) {
+    /*int i;
+    for (i = 0; i < 100; i++) {
         memory[i] = i;
     }*/
     zeroOut(memory, 100);
@@ -367,8 +385,12 @@ CPU_p initialize() {
  */
 FILE* openFileText(char *theFileName) {
     FILE *dataFile;
-    if ((dataFile = fopen(theFileName, "r")) == NULL) {
-        printf("---ERROR, File %s could not be opened.\n", theFileName);
+    dataFile = fopen(theFileName, "r");
+    //if ((dataFile = fopen(theFileName, "r")) == NULL) {
+    if (dataFile == NULL) {
+        printf("\n---ERROR: File %s could not be opened.\n\n", theFileName);
+    } else {
+        printf("\nSUCCESS: File Found: %s\n\n", theFileName); // debugging
     }
     return dataFile;
 }
@@ -389,7 +411,11 @@ void loadProgramInstructions(FILE *inputFile) {
         }
         fclose(inputFile);
 
-        /*printf("TESTING, DELETE ME.\n");
+        if (memory[0] == 0) {
+            printf("\n---ERROR, no instructions were loaded in memory!\n\n");
+        }
+
+        /*printf("TESTING, DEBUGGING.\n");
         int j;
         for(j=0; j<31; j++) {
             printf("%.4x\n", memory[j]);
@@ -402,6 +428,8 @@ void loadProgramInstructions(FILE *inputFile) {
 int main(int argc, char* argv[]) {
     char *fileName = argv[1];
     CPU_p cpu = initialize();
-    loadProgramInstructions(openFileText(fileName)); // TODO: only invoke this function via the Load menu option.
-    controller(cpu);
+    if(fileName != NULL) {
+        loadProgramInstructions(openFileText(fileName));
+    }
+    displayCPU(cpu);
 }
