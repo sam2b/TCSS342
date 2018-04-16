@@ -4,7 +4,7 @@
  *  Date Due: Apr 22, 2018
  *  Authors:  Sam Brendel, Tyler Shupack
  *  Problem 3,4
- *  version: 4.16a
+ *  version: 4.16b
  */
 
 #include "slc3.h"
@@ -302,10 +302,10 @@ void displayCPU(CPU_p cpu) {
     }
 
     // Next 4 lines.
-    printf("PC:  %4X    IR: %4X       %4X: %4X\n", cpu.PC, cpu.ir, i+0x3000, memory[i]);
-    printf("A:   %4X     B: %4X       %4X: %4X\n", cpu.A, cpu.B, i+0x3000, memory[i++]);
-    printf("MAR: %4X   MDR: %4X       %4X: %4X\n", cpu.PC, cpu.ir, i+0x3000, memory[i++]);
-    printf("CC:  N:%d Z:%d P:%d            %4X: %4X\n", cpu.cc >> 2 & 7, cpu.cc >> 1 & 5, cpu.cc & 1, i+0x3000, memory[i++]);
+    printf("PC:  %4X    IR: %4X         %4X: %4X\n", cpu.PC, cpu.ir, i+0x3000, memory[i]);
+    printf("A:   %4X     B: %4X         %4X: %4X\n", cpu.A, cpu.B, i+0x3000, memory[i++]);
+    printf("MAR: %4X   MDR: %4X         %4X: %4X\n", cpu.PC, cpu.ir, i+0x3000, memory[i++]);
+    printf("CC:  N:%d Z:%d P:%d              %4X: %4X\n", cpu.cc >> 2 & 7, cpu.cc >> 1 & 5, cpu.cc & 1, i+0x3000, memory[i++]);
 
     // Last 2 lines.
     printf("%34X: %4X\n", i+0x3000, memory[i++]);
@@ -370,8 +370,8 @@ CPU_p initialize() {
     zeroOut(memory, 100);
 
     // Intentionally hard coding these values into two memory registers.
-    //memory[cpu.reg[1]] = 3;
-    //memory[cpu.reg[2]] = 4;
+    memory[cpu.reg[0]] = 3;
+    memory[cpu.reg[1]] = 4;
     //memory[cpu.reg[3]] = 0xB0B0;   // Intentional simulated data.
     //memory[4] = 0xA0A0;            // Intentional simulated data.
     //memory[cpu.reg[0]] = 0xD0E0;     // Intentional simulated data.
@@ -401,7 +401,7 @@ FILE* openFileText(char *theFileName) {
  * @param inputFile the file to read.
  */
 void loadProgramInstructions(FILE *inputFile) {
-        char instruction [4]; // includes room for the null terminating character.
+        char instruction [5]; // includes room for the null terminating character.
         int length = sizeof(instruction);
         int i = 0;
         while(!feof(inputFile)) {
