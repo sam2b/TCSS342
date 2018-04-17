@@ -4,7 +4,7 @@
  *  Date Due: Apr 22, 2018
  *  Authors:  Sam Brendel, Tyler Shupack
  *  Problem 3,4
- *  version: 4.16e
+ *  version: 4.16g
  */
 #include <stdio.h>
 #include <stdbool.h>
@@ -80,7 +80,7 @@ void displayCPU(CPU_p *);
 void zeroOut(unsigned short *array, int);
 CPU_p initialize();
 unsigned short ZEXT(unsigned short);
-unsigned short SEXT(unsigned short);
+short SEXT(unsigned short);
 void TRAP(unsigned short, CPU_p *);
 unsigned short  getCC(short);
 bool doBen(unsigned short, CPU_p *);

@@ -4,7 +4,7 @@
  *  Date Due: Apr 22, 2018
  *  Authors:  Sam Brendel, Tyler Shupack
  *  Problem 3,4
- *  version: 4.16f
+ *  version: 4.16g
  */
 
 #include "slc3.h"
@@ -27,7 +27,6 @@ void trap(unsigned short vector, CPU_p *cpu) {
     switch (vector) {
     case 0x25:
         printf("==========HALT==========\n");
-        isTrap = true;
         break;
     default: 
         printf("Err: Unknown Trap vector?\n");
@@ -49,7 +48,7 @@ int controller(CPU_p *cpu) {
     short signedShort = 0;
 
     state = FETCH;
-    for (;;) { // efficient endless loop to be used in the next problem
+    for (;!isTrap;) { // efficient endless loop to be used in the next problem
         switch (state) {
             case FETCH: // microstates 18, 33, 35 in the book.
                 //printf("Now in FETCH---------------\n");
@@ -107,11 +106,11 @@ int controller(CPU_p *cpu) {
                 case OP_ADD:
                 case OP_AND:
                     dr   = cpu->ir  & MASK_DR;
-                    dr   = dr     >> BITSHIFT_DR;
+                    dr   = dr      >> BITSHIFT_DR;
                     sr1  = cpu->ir  & MASK_SR1;
-                    sr1  = sr1    >> BITSHIFT_SR1;
+                    sr1  = sr1     >> BITSHIFT_SR1;
                     bit5 = cpu->ir  & MASK_BIT5;
-                    bit5 = bit5   >> BITSHIFT_BIT5;
+                    bit5 = bit5    >> BITSHIFT_BIT5;
                     if (bit5 == 0) {
                         sr2 = cpu->ir & MASK_SR2; // no shift needed.
                     } else if (bit5 == 1) {
@@ -121,16 +120,16 @@ int controller(CPU_p *cpu) {
                     break;
                 case OP_NOT:
                     dr  = cpu->ir  & MASK_DR;
-                    dr  = dr     >> BITSHIFT_DR;
+                    dr  = dr      >> BITSHIFT_DR;
                     sr1 = cpu->ir  & MASK_SR1;
-                    sr1 = sr1    >> BITSHIFT_SR1;
+                    sr1 = sr1     >> BITSHIFT_SR1;
                     break;
                 case OP_TRAP:
                     vector8 = cpu->ir & MASK_TRAPVECT8; // No shift needed.
                     break;
                 case OP_LD:
                     dr      = cpu->ir & MASK_DR;
-                    dr      = dr    >> BITSHIFT_DR;
+                    dr      = dr     >> BITSHIFT_DR;
                     offset  = cpu->ir & MASK_PCOFFSET9;
                     offset  = SEXT(offset);
                     cpu->mar = cpu->pc + offset;
@@ -142,12 +141,12 @@ int controller(CPU_p *cpu) {
                     break;
                 case OP_JMP:
                     sr1 = cpu->ir & MASK_SR1;
-                    sr1 = sr1   >> BITSHIFT_SR1;
+                    sr1 = sr1    >> BITSHIFT_SR1;
                     break;
                 case OP_BR:
-                    nzp = cpu->ir  & MASK_NZP;
-                    nzp = nzp >> BITSHIFT_CC;
-                    offset = cpu->ir  & MASK_PCOFFSET9;
+                    nzp = cpu->ir    & MASK_NZP;
+                    nzp = nzp       >> BITSHIFT_CC;
+                    offset = cpu->ir & MASK_PCOFFSET9;
                     break;
                 default:
                     break;
@@ -162,9 +161,9 @@ int controller(CPU_p *cpu) {
                     if (bit5 == 0) {
                         cpu->mdr = cpu->reg[sr2] + cpu->reg[sr1];
                     } else if (bit5 == 1) {
-                        cpu->mdr = cpu->reg[sr1] + immed; // memory[cpu->reg[sr1]]
+                        cpu->mdr = cpu->reg[sr1] + immed;
                     }
-                    signedShort = cpu->mdr;
+                    signedShort = SEXT(cpu->mdr);
                     cpu->cc = getCC(signedShort); // TODO should this be set in this phase?
                     break;
                 case OP_AND:
@@ -173,12 +172,12 @@ int controller(CPU_p *cpu) {
                     } else if (bit5 == 1) {
                         cpu->mdr = cpu->reg[sr1] & immed;
                     }
-                    signedShort = cpu->mdr;
+                    signedShort = SEXT(cpu->mdr);
                     cpu->cc = getCC(signedShort); // TODO should this be set in this phase?
                     break;
                 case OP_NOT:
                     cpu->mdr = ~cpu->reg[sr1]; // Interpret as a negative if the leading bit is a 1.
-                    signedShort = cpu->mdr;
+                    signedShort = SEXT(cpu->mdr);
                     cpu->cc = getCC(signedShort); // TODO should this be set in this phase?
                     break;
                 case OP_TRAP:
@@ -188,6 +187,7 @@ int controller(CPU_p *cpu) {
                     cpu->reg[7] = cpu->pc; // Store the PC in R7 before loading PC with the starting address of the service routine.
                     cpu->mdr    = memory[cpu->mar]; // read the contents of the register.
                     cpu->pc     = cpu->mdr; // The contents of the MDR are loaded into the PC.  Load the PC with the starting address of the service routine.
+                    isTrap = true;
                     trap(vector8, cpu);
                     break;
                 case OP_JMP:
@@ -196,8 +196,7 @@ int controller(CPU_p *cpu) {
                 case OP_BR:
                     //if(cpu->cc == nzp || nzp == CONDITION_NZP) { // if the last result matches the n or z or p.
                     if (doBen(nzp, cpu)) {
-                        //cpu->mar = cpu->pc + offset +1; // TODO why is is this off by 1?
-                        cpu->pc += (offset + 1); // TODO why is is this off by 1?
+                        cpu->pc += (offset);
                     }
                     break;
             }
@@ -276,11 +275,11 @@ void JUMP(CPU_p *cpu, unsigned short whereTo) {
 }
 
 /**
- * Simulating a SEXT operation.
+ * This returns the same value except it is converted to a signed short instead.
  */
-unsigned short SEXT(unsigned short value) {
-    // Simulated SEXT.
-    return value;
+short SEXT(unsigned short value) {
+    short signedValue = value;
+    return signedValue;
 }
 
 /**
@@ -307,7 +306,7 @@ void displayCPU(CPU_p *cpu) {
         // First 8 lines
         int i = 0;
         for(i = 0; i < 8; i++) {
-            printf("R%u: %4X", i, cpu->reg[i]);   // Registers. memory[cpu->reg[i]]);
+            printf("R%u: %4X", i, cpu->reg[i]);   // Registers.
             printf("%26X: %4X\n", i+SIMULATOR_OFFSET, memory[i]); // Memory.
         }
 
@@ -318,7 +317,7 @@ void displayCPU(CPU_p *cpu) {
         }
 
         // Next 4 lines.
-        printf("PC:  %4X    IR: %4X         %4X: %4X\n", cpu->pc, cpu->ir, i+SIMULATOR_OFFSET, memory[i]);
+        printf("PC:  %4X    IR: %4X         %4X: %4X\n", cpu->pc, cpu->ir, i+SIMULATOR_OFFSET, memory[i++]);
         printf("A:   %4X     B: %4X         %4X: %4X\n", cpu->A, cpu->B, i+SIMULATOR_OFFSET, memory[i++]);
         printf("MAR: %4X   MDR: %4X         %4X: %4X\n", cpu->pc, cpu->ir, i+SIMULATOR_OFFSET, memory[i++]);
         printf("CC:  N:%d Z:%d P:%d              %4X: %4X\n",
@@ -347,14 +346,14 @@ void displayCPU(CPU_p *cpu) {
                     loadProgramInstructions(openFileText(fileName));
                     break;
                 case 3:
-                    printf("CASE3\n"); // do nothing.  Just let the PC run the next instruction.
+                    //printf("CASE3\n"); // do nothing.  Just let the PC run the next instruction.
                     controller(cpu); // invoke exclusively in case 3.
                     break;
                 case 5:
                     printf("CASE5\n"); // Update the window for the memory registers.
                     break;
                 case 9:
-                    printf("CASE9\n");
+                    //printf("CASE9\n");
                     //cpu->IR = 0xF025; // TRAP x25
                     printf("\nBubye\n");
                     exit(0);
