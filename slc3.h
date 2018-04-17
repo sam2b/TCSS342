@@ -4,9 +4,10 @@
  *  Date Due: Apr 22, 2018
  *  Authors:  Sam Brendel, Tyler Shupack
  *  Problem 3,4
- *  version: 4.16d
+ *  version: 4.16e
  */
 #include <stdio.h>
+#include <stdbool.h>
 
 #ifndef SLC3_H_
 #define SLC3_H_
@@ -81,7 +82,8 @@ CPU_p initialize();
 unsigned short ZEXT(unsigned short);
 unsigned short SEXT(unsigned short);
 void TRAP(unsigned short, CPU_p *);
-unsigned short getConditionCode(unsigned short);
+unsigned short  getCC(short);
+bool doBen(unsigned short, CPU_p *);
 void displayHeader();
 FILE* openFileText(char *);
 void loadProgramInstructions(FILE *);

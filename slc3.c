@@ -4,7 +4,7 @@
  *  Date Due: Apr 22, 2018
  *  Authors:  Sam Brendel, Tyler Shupack
  *  Problem 3,4
- *  version: 4.16d
+ *  version: 4.16e
  */
 
 #include "slc3.h"
@@ -43,15 +43,16 @@ int controller(CPU_p *cpu) {
 
     // check to make sure both pointers are not NULL
     // do any initializations here
-    unsigned int opcode, dr, sr1, sr2, bit5, immed, offset, state, condition;    // fields for the IR
+    unsigned int opcode, dr, sr1, sr2, bit5, immed, offset, state, nzp;    // fields for the IR
     unsigned short vector8, vector16;
     bool isCycleComplete = false;
+    short signedShort = 0;
 
     state = FETCH;
     for (;;) { // efficient endless loop to be used in the next problem
         switch (state) {
             case FETCH: // microstates 18, 33, 35 in the book.
-                printf("Now in FETCH---------------\n");
+                //printf("Now in FETCH---------------\n");
                 cpu->mar = cpu->pc;           // Step 1: MAR is loaded with the contends of the PC,
                 cpu->pc++;                   //         and also increment PC. Only done in the FETCH phase.
                 cpu->mdr = memory[cpu->mar];  // Step 2: Interrogate memory, resulting in the instruction placed into the MDR.
@@ -60,7 +61,7 @@ int controller(CPU_p *cpu) {
                 break;
 
             case DECODE: // microstate 32
-                printf("Now in DECODE---------------\n");
+                //printf("Now in DECODE---------------\n");
                 opcode = cpu->ir  & MASK_OPCODE; // Input is the four-bit opcode IR[15:12]. The output line asserted is the one corresponding to the opcode at the input.
                 opcode = opcode  >> BITSHIFT_OPCODE;
                 switch (opcode) {
@@ -76,7 +77,7 @@ int controller(CPU_p *cpu) {
             break;
 
         case EVAL_ADDR:
-            printf("Now in EVAL_ADDR---------------\n");
+            //printf("Now in EVAL_ADDR---------------\n");
             // This phase computes the address of the memory location that is needed to process the instruction.
             // NOTE: Study each opcode to determine what all happens this phase for that opcode.
             // Look at the LD instruction to see microstate 2 example.
@@ -99,7 +100,7 @@ int controller(CPU_p *cpu) {
             break;
 
         case FETCH_OP:
-            printf("Now in FETCH_OP---------------\n");
+            //printf("Now in FETCH_OP---------------\n");
             switch (opcode) {
                 // get operands out of registers into A, B of ALU
                 // or get memory for load instr.
@@ -137,15 +138,15 @@ int controller(CPU_p *cpu) {
                     break;
                 case OP_ST: // Same as LD.
                     // Book page 124.
-                    cpu->mdr = cpu->reg[dr]; //memory[cpu->reg[dr]];
+                    cpu->mdr = cpu->reg[dr];
                     break;
                 case OP_JMP:
                     sr1 = cpu->ir & MASK_SR1;
                     sr1 = sr1   >> BITSHIFT_SR1;
                     break;
                 case OP_BR:
-                    cpu->cc = cpu->ir  & MASK_NZP;
-                    cpu->cc = cpu->cc >> BITSHIFT_CC;
+                    nzp = cpu->ir  & MASK_NZP;
+                    nzp = nzp >> BITSHIFT_CC;
                     offset = cpu->ir  & MASK_PCOFFSET9;
                     break;
                 default:
@@ -155,41 +156,48 @@ int controller(CPU_p *cpu) {
             break;
 
         case EXECUTE: // Note that ST does not have an execute microstate.
-            printf("Now in EXECUTE---------------\n");
+            //printf("Now in EXECUTE---------------\n");
             switch (opcode) {
                 case OP_ADD:
                     if (bit5 == 0) {
-                        cpu->mdr = cpu->reg[sr2] + cpu->reg[sr1]; //memory[cpu->reg[sr2]] + memory[cpu->reg[sr1]];
+                        cpu->mdr = cpu->reg[sr2] + cpu->reg[sr1];
                     } else if (bit5 == 1) {
                         cpu->mdr = cpu->reg[sr1] + immed; // memory[cpu->reg[sr1]]
                     }
-                    condition = getConditionCode(cpu->mdr);
+                    signedShort = cpu->mdr;
+                    cpu->cc = getCC(signedShort); // TODO should this be set in this phase?
                     break;
                 case OP_AND:
                     if (bit5 == 0) {
-                        cpu->mdr = cpu->reg[sr2] & cpu->reg[sr1]; //memory[cpu->reg[sr2]] & memory[cpu->reg[sr1]];
+                        cpu->mdr = cpu->reg[sr2] & cpu->reg[sr1];
                     } else if (bit5 == 1) {
-                        cpu->mdr = cpu->reg[sr1] & immed; // memory[cpu->reg[sr1]]
+                        cpu->mdr = cpu->reg[sr1] & immed;
                     }
+                    signedShort = cpu->mdr;
+                    cpu->cc = getCC(signedShort); // TODO should this be set in this phase?
                     break;
                 case OP_NOT:
-                    cpu->mdr = ~cpu->reg[sr1]; // ~memory[cpu->reg[sr1]];
+                    cpu->mdr = ~cpu->reg[sr1]; // Interpret as a negative if the leading bit is a 1.
+                    signedShort = cpu->mdr;
+                    cpu->cc = getCC(signedShort); // TODO should this be set in this phase?
                     break;
                 case OP_TRAP:
                     // Book page 222.
                     vector16   = ZEXT(vector8); // TODO: should we make this actually do a zero extend to 16 bits?
                     cpu->mar    = vector16;
-                    cpu->reg[7] = cpu->pc; // memory[cpu->reg[7]] // Store the PC in R7 before loading PC with the starting address of the service routine.
+                    cpu->reg[7] = cpu->pc; // Store the PC in R7 before loading PC with the starting address of the service routine.
                     cpu->mdr    = memory[cpu->mar]; // read the contents of the register.
                     cpu->pc     = cpu->mdr; // The contents of the MDR are loaded into the PC.  Load the PC with the starting address of the service routine.
-                    trap(vector8, &cpu);
+                    trap(vector8, cpu);
                     break;
                 case OP_JMP:
-                    cpu->pc = cpu->reg[sr1]; //memory[cpu->reg[sr1]];
+                    cpu->pc = cpu->reg[sr1];
                     break;
                 case OP_BR:
-                     if ((cpu->cc == condition) || (cpu->cc == CONDITION_NZP)) {
-                        cpu->mar = cpu->pc + offset;
+                    //if(cpu->cc == nzp || nzp == CONDITION_NZP) { // if the last result matches the n or z or p.
+                    if (doBen(nzp, cpu)) {
+                        //cpu->mar = cpu->pc + offset +1; // TODO why is is this off by 1?
+                        cpu->pc += (offset + 1); // TODO why is is this off by 1?
                     }
                     break;
             }
@@ -198,22 +206,22 @@ int controller(CPU_p *cpu) {
             break;
 
         case STORE: // Look at ST. Microstate 16 is the store to memory
-            printf("Now in STORE---------------\n");
+            //printf("Now in STORE---------------\n");
             switch (opcode) {
             // write back to register or store MDR into memory
             case OP_ADD:
             case OP_AND: // Same as ADD
             case OP_NOT: // Sam as AND and AND.
-                cpu->reg[dr] = cpu->mdr; //memory[cpu->reg[dr]] = cpu->mdr;
+                cpu->reg[dr] = cpu->mdr;
                 break;
             case OP_LD:
-                cpu->reg[dr] = cpu->mdr; //memory[cpu->reg[dr]] = cpu->mdr; // Load into the register.
+                cpu->reg[dr] = cpu->mdr; // Load into the register.
                 break;
             case OP_ST:
                 memory[cpu->mar] = cpu->mdr;     // Store into memory.
                 break;
             case OP_BR:
-                cpu->pc = cpu->mar;
+                // cpu->pc = cpu->mar; // TODO does this really happen in store phase?
                 break;
             }
 
@@ -235,24 +243,26 @@ int controller(CPU_p *cpu) {
  * @param value the value that was recently computed.
  * @return the condition code that represents the 3bit NZP as binary.
  */
-unsigned short getConditionCode(unsigned short value) {
-    unsigned short code;
+bool doBen(unsigned short nzp, CPU_p *cpu) {
+    return (
+               (cpu->cc == CONDITION_N   &&  nzp == CONDITION_N)
+            || (cpu->cc == CONDITION_Z   &&  nzp == CONDITION_Z)
+            || (cpu->cc == CONDITION_P   &&  nzp == CONDITION_P)
+            || (cpu->cc == CONDITION_NZ  && (nzp == CONDITION_N || nzp == CONDITION_Z))
+            || (cpu->cc == CONDITION_ZP  && (nzp == CONDITION_Z || nzp == CONDITION_P))
+            || (cpu->cc == CONDITION_NP  && (nzp == CONDITION_N || nzp == CONDITION_P))
+            || (cpu->cc == CONDITION_NZP && (nzp == CONDITION_N || nzp == CONDITION_Z || nzp == CONDITION_P))
+            );
+}
 
-    if (value <= 0) {
-        if (value < 0)
+unsigned short getCC(short value) {
+    unsigned short code;
+    if (value < 0)
+        code = CONDITION_N;
+    else if (value == 0)
             code = CONDITION_Z;
-        else if (value == 0)
-                code = CONDITION_Z;
-        else
-            code = CONDITION_NZ;
-    } else if (value >= 0) {
-        if (value > 0)
-            code = CONDITION_P;
-        else if (value == 0)
-                code = CONDITION_Z;
-        else
-            code = CONDITION_ZP;
-    }
+    else
+        code = CONDITION_P;
     return code;
 }
 
@@ -287,7 +297,7 @@ unsigned short ZEXT(unsigned short value) {
  */
 void displayCPU(CPU_p *cpu) {
     for(;;) {
-        printf("---displayCPU()\n"); // debugging
+        //printf("---displayCPU()\n"); // debugging
         bool invalidSelection = true;
         short menuSelection = 0;
         char *fileName[FILENAME_SIZE];
@@ -325,10 +335,10 @@ void displayCPU(CPU_p *cpu) {
             printf("Select: 1) Load,  3) Step,  5) Display Mem,  9) Exit\n");
             fflush(stdout);
 
-            scanf("%d", &menuSelection); // TODO put this back in.  Just debugging v4.16d
-            //menuSelection = 3; //TODO debugging, remove me.
+            //scanf("%d", &menuSelection); // TODO put this back in.  Just debugging v4.16d
+            menuSelection = 3; //TODO debugging, remove me.
 
-            printf("---DEBUGGING: menuSelection=%d", menuSelection);
+            //printf("---DEBUGGING: menuSelection=%d", menuSelection);
             switch(menuSelection) {
                 case 1:
                     printf("Specify file name: ");
@@ -345,7 +355,7 @@ void displayCPU(CPU_p *cpu) {
                     break;
                 case 9:
                     printf("CASE9\n");
-                    //memory[cpu->PC] = 0xF025; // TRAP x25
+                    //cpu->IR = 0xF025; // TRAP x25
                     printf("\nBubye\n");
                     exit(0);
                     break;
@@ -354,7 +364,6 @@ void displayCPU(CPU_p *cpu) {
                     invalidSelection = true;
                     break;
             }
-            printf("---Out of switch(menuSelection)\n"); // debugging
             //fflush(stdout);
         }
     }
@@ -380,17 +389,16 @@ CPU_p initialize() {
                 , { 0, 0, 0, 0, 0, 0, 0, 0 }
                 , 0    // ir
                 , 0    // mar
-                , 0 }; // mdr
+                , 0
+                , 0
+                , 0
+                , 0}; // mdr
 
-    /*int i;
-    for (i = 0; i < 100; i++) {
-        memory[i] = i;
-    }*/
     zeroOut(memory, 100);
 
     // Intentionally hard coding these values into two memory registers.
-    //cpu.reg[0] = 3; //memory[cpu->reg[0]] = 3;
-    //cpu.reg[7] = 4; //memory[cpu->reg[1]] = 4;
+    //cpu.reg[0] = 3;
+    //cpu.reg[7] = 4;
     //cpu->reg[3] = 0xB0B0;   // Intentional simulated data.
     //memory[4]  = 0xA0A0;   // Intentional simulated data.
     //cpu->reg[0] = 0xD0E0;   // Intentional simulated data.
@@ -450,5 +458,5 @@ char *fileName = argv[1];
     if(fileName != NULL) {
         loadProgramInstructions(openFileText(fileName));
     }
-    displayCPU(&cpu);
+    displayCPU(&cpu); // send the address of the object.
 }
