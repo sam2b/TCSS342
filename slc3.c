@@ -4,7 +4,7 @@
  *  Date Due: Apr 22, 2018
  *  Authors:  Sam Brendel, Tyler Shupack
  *  Problem 3,4
- *  version: 4.16e
+ *  version: 4.16f
  */
 
 #include "slc3.h"
@@ -335,8 +335,8 @@ void displayCPU(CPU_p *cpu) {
             printf("Select: 1) Load,  3) Step,  5) Display Mem,  9) Exit\n");
             fflush(stdout);
 
-            //scanf("%d", &menuSelection); // TODO put this back in.  Just debugging v4.16d
-            menuSelection = 3; //TODO debugging, remove me.
+            scanf("%d", &menuSelection); // TODO put this back in.  Just debugging v4.16d
+            //menuSelection = 3; //TODO debugging, remove me.
 
             //printf("---DEBUGGING: menuSelection=%d", menuSelection);
             switch(menuSelection) {
