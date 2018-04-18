@@ -4,7 +4,7 @@
  *  Date Due: Apr 22, 2018
  *  Authors:  Sam Brendel, Tyler Shupack
  *  Problem 3,4
- *  version: 4.16g
+ *  version: 4.17a
  */
 
 #include "slc3.h"
@@ -15,7 +15,7 @@
 #include <ncurses.h>
 
 unsigned short memory[MEMORY_SIZE];
-bool isTrap = false;
+bool isHalted = false;
 
 /**
  * Simulates trap table lookup for now
@@ -27,6 +27,8 @@ void trap(unsigned short vector, CPU_p *cpu) {
     switch (vector) {
     case 0x25:
         printf("==========HALT==========\n");
+        cpu->pc = 0; // reset to zero as per Prof Mobus.
+        isHalted = true;
         break;
     default: 
         printf("Err: Unknown Trap vector?\n");
@@ -48,7 +50,7 @@ int controller(CPU_p *cpu) {
     short signedShort = 0;
 
     state = FETCH;
-    for (;!isTrap;) { // efficient endless loop to be used in the next problem
+    while (!isHalted) { // efficient endless loop to be used in the next problem
         switch (state) {
             case FETCH: // microstates 18, 33, 35 in the book.
                 //printf("Now in FETCH---------------\n");
@@ -187,14 +189,12 @@ int controller(CPU_p *cpu) {
                     cpu->reg[7] = cpu->pc; // Store the PC in R7 before loading PC with the starting address of the service routine.
                     cpu->mdr    = memory[cpu->mar]; // read the contents of the register.
                     cpu->pc     = cpu->mdr; // The contents of the MDR are loaded into the PC.  Load the PC with the starting address of the service routine.
-                    isTrap = true;
                     trap(vector8, cpu);
                     break;
                 case OP_JMP:
                     cpu->pc = cpu->reg[sr1];
                     break;
                 case OP_BR:
-                    //if(cpu->cc == nzp || nzp == CONDITION_NZP) { // if the last result matches the n or z or p.
                     if (doBen(nzp, cpu)) {
                         cpu->pc += (offset);
                     }
@@ -230,7 +230,7 @@ int controller(CPU_p *cpu) {
             break;
         } // end switch (state)
 
-        if (isTrap || isCycleComplete) {
+        if (isHalted || isCycleComplete) {
            break;
         }
     } // end for()
@@ -297,8 +297,8 @@ unsigned short ZEXT(unsigned short value) {
 void displayCPU(CPU_p *cpu) {
     for(;;) {
         //printf("---displayCPU()\n"); // debugging
-        bool invalidSelection = true;
-        short menuSelection = 0;
+        bool rePromptUser = true;
+        int menuSelection = 0;
         char *fileName[FILENAME_SIZE];
         printf("Welcome to the LC-3 Simulator Simulator\n");
         printf("Registers                     Memory\n");
@@ -329,15 +329,14 @@ void displayCPU(CPU_p *cpu) {
 
         // Last 2 lines.
         printf("%34X: %4X\n", i+SIMULATOR_OFFSET, memory[i++]);
-        while(invalidSelection) {
-            invalidSelection = false;
+        while(rePromptUser) {
+            rePromptUser = false;
             printf("Select: 1) Load,  3) Step,  5) Display Mem,  9) Exit\n");
             fflush(stdout);
 
             scanf("%d", &menuSelection); // TODO put this back in.  Just debugging v4.16d
             //menuSelection = 3; //TODO debugging, remove me.
 
-            //printf("---DEBUGGING: menuSelection=%d", menuSelection);
             switch(menuSelection) {
                 case 1:
                     printf("Specify file name: ");
@@ -360,7 +359,7 @@ void displayCPU(CPU_p *cpu) {
                     break;
                 default:
                     printf("---Invalid selection\n.");
-                    invalidSelection = true;
+                    rePromptUser = true;
                     break;
             }
             //fflush(stdout);
@@ -440,12 +439,6 @@ void loadProgramInstructions(FILE *inputFile) {
         if (memory[0] == 0) {
             printf("\n---ERROR, no instructions were loaded in memory!\n\n");
         }
-
-        /*printf("TESTING, DEBUGGING.\n");
-        int j;
-        for(j=0; j<31; j++) {
-            printf("%.4x\n", memory[j]);
-        }*/
 }
 
 /**
