@@ -4,7 +4,7 @@
  *  Date Due: Apr 22, 2018
  *  Authors:  Sam Brendel, Tyler Shupack
  *  Problem 3,4
- *  version: 4.17a
+ *  version: 4.18a
  */
 
 #include "slc3.h"
@@ -317,13 +317,13 @@ void displayCPU(CPU_p *cpu) {
         }
 
         // Next 4 lines.
-        printf("PC:  %4X    IR: %4X         %4X: %4X\n", cpu->pc, cpu->ir, i+SIMULATOR_OFFSET, memory[i++]);
+        printf("PC:  %4X    IR: %4X         %4X: %4X\n", cpu->pc+0x3000, cpu->ir, i+SIMULATOR_OFFSET, memory[i++]);
         printf("A:   %4X     B: %4X         %4X: %4X\n", cpu->A, cpu->B, i+SIMULATOR_OFFSET, memory[i++]);
-        printf("MAR: %4X   MDR: %4X         %4X: %4X\n", cpu->pc, cpu->ir, i+SIMULATOR_OFFSET, memory[i++]);
+        printf("MAR: %4X   MDR: %4X         %4X: %4X\n", cpu->mar+0x3000, cpu->ir, i+SIMULATOR_OFFSET, memory[i++]);
         printf("CC:  N:%d Z:%d P:%d              %4X: %4X\n",
                 cpu->cc >> BITSHIFT_CC_BIT3 & MASK_CC_N,
                 cpu->cc >> BITSHIFT_CC_BIT2 & MASK_CC_Z,
-                cpu->cc & MASK_CC_P,
+                cpu->cc  & MASK_CC_P,
                 i+SIMULATOR_OFFSET,
                 memory[i++]);
 
@@ -390,7 +390,7 @@ CPU_p initialize() {
                 , 0
                 , 0
                 , 0
-                , 0}; // mdr
+                , 0};  // mdr
 
     zeroOut(memory, 100);
 
