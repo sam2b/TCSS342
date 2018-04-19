@@ -4,7 +4,7 @@
  *  Date Due: Apr 22, 2018
  *  Authors:  Sam Brendel, Tyler Shupack
  *  Problem 3,4
- *  version: 4.18a
+ *  version: 4.19b
  */
 
 #include "slc3.h"
@@ -307,21 +307,21 @@ void displayCPU(CPU_p *cpu, int memStart) {
         // First 8 lines
         int i = 0;
         for(i = 0; i < 8; i++) {
-            printf("R%u: %4X", i, cpu->reg[i]);   // Registers.
-            printf("%26X: %4X\n", i+memStart, memory[i]); // Memory.
+            printf("R%u: x%04X", i, cpu->reg[i]);   // Registers.
+            printf("                  x%04X: x%04X\n", i+memStart, memory[i]); // Memory.
         }
 
         // Next 3 lines
         int j;
         for (j = 0; j < 3; j++ & i++) {
-            printf("%34X: %4X\n", i+memStart, memory[i]);
+            printf("                           x%04X: x%04X\n", i+memStart, memory[i]);
         }
 
         // Next 4 lines.
-        printf("PC:  %4X    IR: %4X         %4X: %4X\n", cpu->pc+SIMULATOR_OFFSET, cpu->ir, i+memStart, memory[i++]);
-        printf("A:   %4X     B: %4X         %4X: %4X\n", cpu->A, cpu->B, i+memStart, memory[i++]);
-        printf("MAR: %4X   MDR: %4X         %4X: %4X\n", cpu->mar, cpu->ir, i+memStart, memory[i++]);
-        printf("CC:  N:%d Z:%d P:%d              %4X: %4X\n",
+        printf("PC:  x%04X    IR: x%04X    x%04X: x%04X\n", cpu->pc+SIMULATOR_OFFSET, cpu->ir, i+memStart, memory[i++]);
+        printf("A:   x%04X     B: x%04X    x%04X: x%04X\n", cpu->A, cpu->B, i+memStart, memory[i++]);
+        printf("MAR: x%04X   MDR: x%04X    x%04X: x%04X\n", cpu->mar, cpu->ir, i+memStart, memory[i++]);
+        printf("CC:  N:%d Z:%d P:%d           x%04X: x%04X\n",
                 cpu->cc >> BITSHIFT_CC_BIT3 & MASK_CC_N,
                 cpu->cc >> BITSHIFT_CC_BIT2 & MASK_CC_Z,
                 cpu->cc  & MASK_CC_P,
@@ -329,7 +329,7 @@ void displayCPU(CPU_p *cpu, int memStart) {
                 memory[i++]);
 
         // Last 2 lines.
-        printf("%34X: %4X\n", i+memStart, memory[i++]);
+        printf("                           x%04X: x%04X\n", i+memStart, memory[i++]);
         while(rePromptUser) {
             rePromptUser = false;
             printf("Select: 1) Load,  3) Step,  5) Display Mem,  9) Exit\n");
