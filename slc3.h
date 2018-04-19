@@ -51,7 +51,7 @@
 #define CONDITION_NZ  6 // 0000 1100 0000 0000
 #define CONDITION_NP  5 // 0000 1010 0000 0000
 #define CONDITION_ZP  3 // 0000 0110 0000 0000
-#define CONDITION_NZP 7 // 0000 0110 0000 0000
+#define CONDITION_NZP 7 // 0000 1110 0000 0000
 
 #define BITSHIFT_OPCODE 12
 #define BITSHIFT_DR      9
@@ -76,7 +76,7 @@ struct CPUType {
 typedef struct CPUType CPU_p;
 
 int controller (CPU_p *);
-void displayCPU(CPU_p *);
+void displayCPU(CPU_p *, int);
 void zeroOut(unsigned short *array, int);
 CPU_p initialize();
 unsigned short ZEXT(unsigned short);

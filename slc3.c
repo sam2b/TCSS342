@@ -294,11 +294,12 @@ unsigned short ZEXT(unsigned short value) {
  * Print out fields to the console for the CPU_p object.
  * @param cpu the cpu object containing the data.
  */
-void displayCPU(CPU_p *cpu) {
+void displayCPU(CPU_p *cpu, int memStart) {
     for(;;) {
         //printf("---displayCPU()\n"); // debugging
         bool rePromptUser = true;
         int menuSelection = 0;
+        int newStart = 0;
         char *fileName[FILENAME_SIZE];
         printf("Welcome to the LC-3 Simulator Simulator\n");
         printf("Registers                     Memory\n");
@@ -307,28 +308,28 @@ void displayCPU(CPU_p *cpu) {
         int i = 0;
         for(i = 0; i < 8; i++) {
             printf("R%u: %4X", i, cpu->reg[i]);   // Registers.
-            printf("%26X: %4X\n", i+SIMULATOR_OFFSET, memory[i]); // Memory.
+            printf("%26X: %4X\n", i+memStart, memory[i]); // Memory.
         }
 
         // Next 3 lines
         int j;
         for (j = 0; j < 3; j++ & i++) {
-            printf("%34X: %4X\n", i+SIMULATOR_OFFSET, memory[i]);
+            printf("%34X: %4X\n", i+memStart, memory[i]);
         }
 
         // Next 4 lines.
-        printf("PC:  %4X    IR: %4X         %4X: %4X\n", cpu->pc+0x3000, cpu->ir, i+SIMULATOR_OFFSET, memory[i++]);
-        printf("A:   %4X     B: %4X         %4X: %4X\n", cpu->A, cpu->B, i+SIMULATOR_OFFSET, memory[i++]);
-        printf("MAR: %4X   MDR: %4X         %4X: %4X\n", cpu->mar+0x3000, cpu->ir, i+SIMULATOR_OFFSET, memory[i++]);
+        printf("PC:  %4X    IR: %4X         %4X: %4X\n", cpu->pc+memStart, cpu->ir, i+memStart, memory[i++]);
+        printf("A:   %4X     B: %4X         %4X: %4X\n", cpu->A, cpu->B, i+memStart, memory[i++]);
+        printf("MAR: %4X   MDR: %4X         %4X: %4X\n", cpu->mar+memStart, cpu->ir, i+memStart, memory[i++]);
         printf("CC:  N:%d Z:%d P:%d              %4X: %4X\n",
                 cpu->cc >> BITSHIFT_CC_BIT3 & MASK_CC_N,
                 cpu->cc >> BITSHIFT_CC_BIT2 & MASK_CC_Z,
                 cpu->cc  & MASK_CC_P,
-                i+SIMULATOR_OFFSET,
+                i+memStart,
                 memory[i++]);
 
         // Last 2 lines.
-        printf("%34X: %4X\n", i+SIMULATOR_OFFSET, memory[i++]);
+        printf("%34X: %4X\n", i+memStart, memory[i++]);
         while(rePromptUser) {
             rePromptUser = false;
             printf("Select: 1) Load,  3) Step,  5) Display Mem,  9) Exit\n");
@@ -349,7 +350,11 @@ void displayCPU(CPU_p *cpu) {
                     controller(cpu); // invoke exclusively in case 3.
                     break;
                 case 5:
-                    printf("CASE5\n"); // Update the window for the memory registers.
+                    printf("New Starting Address: ");
+                    fflush(stdout);
+                    scanf("%x", &newStart);
+                    displayCPU(cpu, newStart);
+                    //printf("CASE5\n"); // Update the window for the memory registers.
                     break;
                 case 9:
                     //printf("CASE9\n");
@@ -450,5 +455,5 @@ char *fileName = argv[1];
     if(fileName != NULL) {
         loadProgramInstructions(openFileText(fileName));
     }
-    displayCPU(&cpu); // send the address of the object.
+    displayCPU(&cpu, SIMULATOR_OFFSET); // send the address of the object.
 }
