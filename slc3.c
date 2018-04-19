@@ -318,9 +318,9 @@ void displayCPU(CPU_p *cpu, int memStart) {
         }
 
         // Next 4 lines.
-        printf("PC:  %4X    IR: %4X         %4X: %4X\n", cpu->pc+memStart, cpu->ir, i+memStart, memory[i++]);
+        printf("PC:  %4X    IR: %4X         %4X: %4X\n", cpu->pc+SIMULATOR_OFFSET, cpu->ir, i+memStart, memory[i++]);
         printf("A:   %4X     B: %4X         %4X: %4X\n", cpu->A, cpu->B, i+memStart, memory[i++]);
-        printf("MAR: %4X   MDR: %4X         %4X: %4X\n", cpu->mar+memStart, cpu->ir, i+memStart, memory[i++]);
+        printf("MAR: %4X   MDR: %4X         %4X: %4X\n", cpu->mar, cpu->ir, i+memStart, memory[i++]);
         printf("CC:  N:%d Z:%d P:%d              %4X: %4X\n",
                 cpu->cc >> BITSHIFT_CC_BIT3 & MASK_CC_N,
                 cpu->cc >> BITSHIFT_CC_BIT2 & MASK_CC_Z,
@@ -352,7 +352,7 @@ void displayCPU(CPU_p *cpu, int memStart) {
                 case 5:
                     printf("New Starting Address: ");
                     fflush(stdout);
-                    scanf("%x", &newStart);
+                    scanf("%4X", &newStart);
                     displayCPU(cpu, newStart);
                     //printf("CASE5\n"); // Update the window for the memory registers.
                     break;
