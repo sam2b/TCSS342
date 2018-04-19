@@ -4,7 +4,7 @@
  *  Date Due: Apr 22, 2018
  *  Authors:  Sam Brendel, Tyler Shupack
  *  Problem 3,4
- *  version: 4.16g
+ *  version: 4.19a
  */
 #include <stdio.h>
 #include <stdbool.h>
@@ -14,7 +14,7 @@
 
 #define MEMORY_SIZE         100
 #define FILENAME_SIZE       200
-#define SIMULATOR_OFFSET 0x3000
+#define ADDRESS_MIN      0x3000
 
 #define FETCH     0
 #define DECODE    1
@@ -82,7 +82,7 @@ CPU_p initialize();
 unsigned short ZEXT(unsigned short);
 short SEXT(unsigned short);
 void TRAP(unsigned short, CPU_p *);
-unsigned short  getCC(short);
+unsigned short getCC(unsigned short);
 bool doBen(unsigned short, CPU_p *);
 void displayHeader();
 FILE* openFileText(char *);

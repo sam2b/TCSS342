@@ -4,7 +4,7 @@
  *  Date Due: Apr 22, 2018
  *  Authors:  Sam Brendel, Tyler Shupack
  *  Problem 3,4
- *  version: 4.19b
+ *  version: 4.19a
  */
 
 #include "slc3.h"
@@ -165,8 +165,7 @@ int controller(CPU_p *cpu) {
                     } else if (bit5 == 1) {
                         cpu->mdr = cpu->reg[sr1] + immed;
                     }
-                    signedShort = SEXT(cpu->mdr);
-                    cpu->cc = getCC(signedShort); // TODO should this be set in this phase?
+                    cpu->cc = getCC(cpu->mdr); // TODO should this be set in this phase?
                     break;
                 case OP_AND:
                     if (bit5 == 0) {
@@ -174,13 +173,11 @@ int controller(CPU_p *cpu) {
                     } else if (bit5 == 1) {
                         cpu->mdr = cpu->reg[sr1] & immed;
                     }
-                    signedShort = SEXT(cpu->mdr);
-                    cpu->cc = getCC(signedShort); // TODO should this be set in this phase?
+                    cpu->cc = getCC(cpu->mdr); // TODO should this be set in this phase?
                     break;
                 case OP_NOT:
                     cpu->mdr = ~cpu->reg[sr1]; // Interpret as a negative if the leading bit is a 1.
-                    signedShort = SEXT(cpu->mdr);
-                    cpu->cc = getCC(signedShort); // TODO should this be set in this phase?
+                    cpu->cc = getCC(cpu->mdr); // TODO should this be set in this phase?
                     break;
                 case OP_TRAP:
                     // Book page 222.
@@ -254,11 +251,12 @@ bool doBen(unsigned short nzp, CPU_p *cpu) {
             );
 }
 
-unsigned short getCC(short value) {
+unsigned short getCC(unsigned short value) {
+    short signedValue = value;
     unsigned short code;
-    if (value < 0)
+    if (signedValue < 0)
         code = CONDITION_N;
-    else if (value == 0)
+    else if (signedValue == 0)
             code = CONDITION_Z;
     else
         code = CONDITION_P;
@@ -318,14 +316,19 @@ void displayCPU(CPU_p *cpu, int memStart) {
         }
 
         // Next 4 lines.
-        printf("PC:  x%04X    IR: x%04X    x%04X: x%04X\n", cpu->pc+SIMULATOR_OFFSET, cpu->ir, i+memStart, memory[i++]);
+        if (cpu->pc == 0) {
+            cpu->mar = 0;
+        } else {
+            cpu->mar += ADDRESS_MIN;
+        }
+        printf("PC:  x%04X    IR: x%04X    x%04X: x%04X\n", cpu->pc+ADDRESS_MIN, cpu->ir, i+memStart, memory[i++]);
         printf("A:   x%04X     B: x%04X    x%04X: x%04X\n", cpu->A, cpu->B, i+memStart, memory[i++]);
         printf("MAR: x%04X   MDR: x%04X    x%04X: x%04X\n", cpu->mar, cpu->ir, i+memStart, memory[i++]);
         printf("CC:  N:%d Z:%d P:%d           x%04X: x%04X\n",
                 cpu->cc >> BITSHIFT_CC_BIT3 & MASK_CC_N,
                 cpu->cc >> BITSHIFT_CC_BIT2 & MASK_CC_Z,
                 cpu->cc  & MASK_CC_P,
-                i+memStart,
+                i+ADDRESS_MIN,
                 memory[i++]);
 
         // Last 2 lines.
@@ -335,7 +338,7 @@ void displayCPU(CPU_p *cpu, int memStart) {
             printf("Select: 1) Load,  3) Step,  5) Display Mem,  9) Exit\n");
             fflush(stdout);
 
-            scanf("%d", &menuSelection); // TODO put this back in.  Just debugging v4.16d
+            scanf("%d", &menuSelection); // TODO put this back in.  Just debugging.
             //menuSelection = 3; //TODO debugging, remove me.
 
             switch(menuSelection) {
@@ -418,9 +421,14 @@ FILE* openFileText(char *theFileName) {
     dataFile = fopen(theFileName, "r");
     //if ((dataFile = fopen(theFileName, "r")) == NULL) {
     if (dataFile == NULL) {
-        printf("\n---ERROR: File %s could not be opened.\n\n", theFileName);
+//        printf("\n---ERROR: File %s could not be opened.\n\n", theFileName);
+        char temp;
+        printf("Error, File not found.  Press <ENTER> to continue.", theFileName);
+        fflush(stdin);
+        temp = getchar(); // BUG this does not work as expected in option #1.
+        printf("\n");
     } else {
-        printf("\nSUCCESS: File Found: %s\n\n", theFileName); // debugging
+        //printf("\nSUCCESS: File Found: %s\n\n", theFileName); // debugging
     }
     return dataFile;
 }
@@ -431,18 +439,39 @@ FILE* openFileText(char *theFileName) {
  * @param inputFile the file to read.
  */
 void loadProgramInstructions(FILE *inputFile) {
-        char instruction [5]; // includes room for the null terminating character.
+    if (inputFile != NULL){
+        char instruction [5]; // includes room for the carriage return character.
         int length = sizeof(instruction);
         int i = 0;
+        unsigned short startingAddress = 0;
+
+        /* The first line in the inputfile is actually the starting address of
+           where to begin loading the instructions into memory.  This is
+           a result of the .ORIG instruction in assembly. */
+        if(!feof(inputFile)) {
+            fgets(instruction, length, inputFile);
+            startingAddress = strtol(instruction, NULL, 16);
+            fgets(instruction, length, inputFile); // processes the carriage return character.
+        }
+
+        // In this simulator, we start 0x3000 is the zero'th element in memory[].
+        if (startingAddress >= 0x3000) {
+            i = (startingAddress - 0x3000);
         while(!feof(inputFile)) {
             fgets(instruction, length, inputFile);
             memory[i++] = strtol(instruction, NULL, 16);
-            fgets(instruction, length, inputFile); // FIXME: hackaround for getting a zero instead of the next line.
+                fgets(instruction, length, inputFile); // processes the carriage return character.
+        }
+        } else {
+            printf("Error, starting adddress must be between %x and %x\n"
+                    , ADDRESS_MIN, (ADDRESS_MIN + MEMORY_SIZE));
         }
         fclose(inputFile);
 
         if (memory[0] == 0) {
-            printf("\n---ERROR, no instructions were loaded in memory!\n\n");
+            //printf("\n---ERROR, no instructions were loaded in memory!\n\n");
+            // This should not happen, but here at least for debugging.
+        }
         }
 }
 
@@ -450,10 +479,11 @@ void loadProgramInstructions(FILE *inputFile) {
  * Driver for the program.
  */
 int main(int argc, char* argv[]) {
-char *fileName = argv[1];
+    char *fileName = argv[1];
     CPU_p cpu = initialize();
-    if(fileName != NULL) {
+    FILE *theFile = openFileText(fileName);
+    if(theFile != NULL) {
         loadProgramInstructions(openFileText(fileName));
     }
-    displayCPU(&cpu, SIMULATOR_OFFSET); // send the address of the object.
+    displayCPU(&cpu, ADDRESS_MIN); // send the address of the object.
 }
