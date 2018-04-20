@@ -4,7 +4,7 @@
  *  Date Due: Apr 22, 2018
  *  Authors:  Sam Brendel, Tyler Shupack
  *  Problem 3,4
- *  version: 4.19a
+ *  version: 4.20a
  */
 
 #include "slc3.h"
@@ -292,7 +292,7 @@ unsigned short ZEXT(unsigned short value) {
  * Print out fields to the console for the CPU_p object.
  * @param cpu the cpu object containing the data.
  */
-void displayCPU(CPU_p *cpu, int memStart) {
+/*void displayCPU(CPU_p *cpu, int memStart) {
     for(;;) {
         //printf("---displayCPU()\n"); // debugging
         bool rePromptUser = true;
@@ -353,7 +353,7 @@ void displayCPU(CPU_p *cpu, int memStart) {
                     controller(cpu); // invoke exclusively in case 3.
                     break;
                 case 5:
-                    printf("New Starting Address: ");
+                    printf("New Starting Address: x");
                     fflush(stdout);
                     scanf("%4X", &newStart);
                     displayCPU(cpu, newStart);
@@ -373,8 +373,107 @@ void displayCPU(CPU_p *cpu, int memStart) {
             //fflush(stdout);
         }
     }
-}
+}*/
 
+void displayCPU(CPU_p *cpu, int memStart) {
+
+    int c;
+
+    initscr();
+    cbreak();
+    clear();
+    noecho();
+
+    WINDOW *main_win = newwin(28, 41, 0, 0);
+    box(main_win, 0, 0);
+    refresh();
+
+    while(1) {
+
+        bool rePromptUser = true;
+        int menuSelection = 0;
+        int newStart = 0;
+        char *fileName[FILENAME_SIZE];
+        mvwprintw(main_win, 1, 1, "Welcome to the LC-3 Simulator Simulator");
+        mvwprintw(main_win, 2, 1, "Registers");
+        mvwprintw(main_win, 2, 31, "Memory");
+
+        // First 8 lines
+        int i = 0;
+        for(i = 0; i < 8; i++) {
+            mvwprintw(main_win, 3+i, 1, "R%u: x%04X", i, cpu->reg[i]);   // Registers.
+            mvwprintw(main_win, 3+i, 28, "x%04X: x%04X", i+memStart, memory[i]); // Memory.
+        }
+
+        // Next 3 lines
+        int j = 0;
+        for (j = 0; j < 3; j++ & i++) {
+            mvwprintw(main_win, 11+j, 28, "x%04X: x%04X", i+memStart, memory[i]);
+        }
+
+        // Next 4 lines.
+        if (cpu->pc == 0) {
+            cpu->mar = 0;
+        } else {
+            cpu->mar += ADDRESS_MIN;
+        }
+        mvwprintw(main_win, 14, 1, "PC:  x%04X    IR: x%04X    x%04X: x%04X", cpu->pc+ADDRESS_MIN, cpu->ir, i+memStart, memory[i]);
+        mvwprintw(main_win, 15, 1, "A:   x%04X     B: x%04X    x%04X: x%04X", cpu->A, cpu->B, i+memStart, memory[i++]);
+        mvwprintw(main_win, 16, 1, "MAR: x%04X   MDR: x%04X    x%04X: x%04X", cpu->mar, cpu->ir, i+memStart, memory[i++]);
+        mvwprintw(main_win, 17, 1, "CC:  N:%d Z:%d P:%d           x%04X: x%04X",
+                cpu->cc >> BITSHIFT_CC_BIT3 & MASK_CC_N,
+                cpu->cc >> BITSHIFT_CC_BIT2 & MASK_CC_Z,
+                cpu->cc  & MASK_CC_P,
+                i+ADDRESS_MIN,
+                memory[i++]);
+
+        // Last 2 lines.
+        mvwprintw(main_win, 18, 28, "x%04X: x%04X", i+memStart, memory[i++]);
+        mvwprintw(main_win, 19, 1, "Select: 1) Load,         3) Step");  
+        mvwprintw(main_win, 20, 9, "5) Display Mem,  9) Exit");
+        mvwprintw(main_win, 21, 1, " ------------------------------------- ");
+
+        c = wgetch(main_win);
+
+        while(rePromptUser) {
+            rePromptUser = false;
+            switch(c){
+
+                case 1:
+                    mvwprintw(main_win, 23, 1, "Specify file name: ");
+                    scanf("%s", fileName);
+                    loadProgramInstructions(openFileText(fileName));
+                    refresh();
+                    break;
+                case 3:
+                    //printf("CASE3\n"); // do nothing.  Just let the PC run the next instruction.
+                    controller(cpu); // invoke exclusively in case 3.
+                    refresh();
+                    break;
+                case 5:
+                    mvwprintw(main_win, 23, 1, "New Starting Address: x");
+                    scanf("%4X", &newStart);
+                    displayCPU(cpu, newStart);
+                    refresh();
+                    //printf("CASE5\n"); // Update the window for the memory registers.
+                    break;
+            case 9:
+                    //printf("CASE9\n");
+                    //cpu->IR = 0xF025; // TRAP x25
+                    mvwprintw(main_win, 23, 1, "\nBubye\n");
+                    refresh();
+                    endwin();
+                    exit(0);
+                    break;
+            default:
+                mvwprintw(main_win, 23, 1, "---Invalid selection\n.");
+                rePromptUser = true;
+                refresh();
+                break;
+            }
+        }
+    }
+}
 /**
  * Sets all elements to zero.
  */
@@ -479,6 +578,7 @@ void loadProgramInstructions(FILE *inputFile) {
  * Driver for the program.
  */
 int main(int argc, char* argv[]) {
+
     char *fileName = argv[1];
     CPU_p cpu = initialize();
     FILE *theFile = openFileText(fileName);
