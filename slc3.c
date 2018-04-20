@@ -4,7 +4,7 @@
  *  Date Due: Apr 22, 2018
  *  Authors:  Sam Brendel, Tyler Shupack
  *  Problem 3,4
- *  version: 4.20b
+ *  version: 4.20c
  */
 
 #include "slc3.h"
@@ -383,7 +383,6 @@ void displayCPU(CPU_p *cpu, int memStart) {
     initscr();
     cbreak();
     clear();
-    noecho();
 
     WINDOW *main_win = newwin(28, 41, 0, 0);
     box(main_win, 0, 0);
@@ -436,7 +435,8 @@ void displayCPU(CPU_p *cpu, int memStart) {
 
         c = wgetch(main_win);
 
-        mvwprintw(main_win, 23, 1, "Char: %c", c);
+        mvwprintw(main_win, 23, 1, "Input: %c", c);
+        refresh();
 
         while(rePromptUser) {
             rePromptUser = false;
@@ -444,7 +444,7 @@ void displayCPU(CPU_p *cpu, int memStart) {
                 case '1':
                     mvwprintw(main_win, 23, 1, "Specify file name: ");
                     refresh();
-                    scanf("%s", fileName);
+                    wgetstr(main_win, fileName);
                     loadProgramInstructions(openFileText(fileName));
                     break;
                 case '3':
