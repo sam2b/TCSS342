@@ -4,7 +4,7 @@
  *  Date Due: Apr 22, 2018
  *  Authors:  Sam Brendel, Tyler Shupack
  *  Problem 3,4
- *  version: 4.20a
+ *  version: 4.20b
  */
 
 #include "slc3.h"
@@ -321,7 +321,7 @@ unsigned short ZEXT(unsigned short value) {
         } else {
             cpu->mar += ADDRESS_MIN;
         }
-        printf("PC:  x%04X    IR: x%04X    x%04X: x%04X\n", cpu->pc+ADDRESS_MIN, cpu->ir, i+memStart, memory[i++]);
+        printf("PC:  x%04X    IR: x%04X    x%04X: x%04X\n", cpu->pc+ADDRESS_MIN, cpu->ir, i+memStart, memory[i]);
         printf("A:   x%04X     B: x%04X    x%04X: x%04X\n", cpu->A, cpu->B, i+memStart, memory[i++]);
         printf("MAR: x%04X   MDR: x%04X    x%04X: x%04X\n", cpu->mar, cpu->ir, i+memStart, memory[i++]);
         printf("CC:  N:%d Z:%d P:%d           x%04X: x%04X\n",
@@ -356,6 +356,7 @@ unsigned short ZEXT(unsigned short value) {
                     printf("New Starting Address: x");
                     fflush(stdout);
                     scanf("%4X", &newStart);
+
                     displayCPU(cpu, newStart);
                     //printf("CASE5\n"); // Update the window for the memory registers.
                     break;
@@ -435,29 +436,29 @@ void displayCPU(CPU_p *cpu, int memStart) {
 
         c = wgetch(main_win);
 
+        mvwprintw(main_win, 23, 1, "Char: %c", c);
+
         while(rePromptUser) {
             rePromptUser = false;
             switch(c){
-
-                case 1:
+                case '1':
                     mvwprintw(main_win, 23, 1, "Specify file name: ");
+                    refresh();
                     scanf("%s", fileName);
                     loadProgramInstructions(openFileText(fileName));
-                    refresh();
                     break;
-                case 3:
+                case '3':
                     //printf("CASE3\n"); // do nothing.  Just let the PC run the next instruction.
                     controller(cpu); // invoke exclusively in case 3.
-                    refresh();
                     break;
-                case 5:
+                case '5':
                     mvwprintw(main_win, 23, 1, "New Starting Address: x");
+                    refresh();
                     scanf("%4X", &newStart);
                     displayCPU(cpu, newStart);
-                    refresh();
                     //printf("CASE5\n"); // Update the window for the memory registers.
                     break;
-            case 9:
+                case '9':
                     //printf("CASE9\n");
                     //cpu->IR = 0xF025; // TRAP x25
                     mvwprintw(main_win, 23, 1, "\nBubye\n");
@@ -465,12 +466,13 @@ void displayCPU(CPU_p *cpu, int memStart) {
                     endwin();
                     exit(0);
                     break;
-            default:
-                mvwprintw(main_win, 23, 1, "---Invalid selection\n.");
-                rePromptUser = true;
-                refresh();
-                break;
+                default:
+                    mvwprintw(main_win, 23, 1, "---Invalid selection\n.");
+                    refresh();
+                    rePromptUser = true;
+                    break;
             }
+            wrefresh(main_win);
         }
     }
 }
