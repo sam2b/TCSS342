@@ -4,7 +4,7 @@
  *  Date Due: Apr 22, 2018
  *  Authors:  Sam Brendel, Tyler Shupack
  *  Problem 3,4
- *  version: 4.20c
+ *  version: 4.21a
  */
 
 #include "slc3.h"
@@ -393,6 +393,7 @@ void displayCPU(CPU_p *cpu, int memStart) {
         bool rePromptUser = true;
         int menuSelection = 0;
         int newStart = 0;
+        char inStart[4];
         char *fileName[FILENAME_SIZE];
         mvwprintw(main_win, 1, 1, "Welcome to the LC-3 Simulator Simulator");
         mvwprintw(main_win, 2, 1, "Registers");
@@ -454,7 +455,8 @@ void displayCPU(CPU_p *cpu, int memStart) {
                 case '5':
                     mvwprintw(main_win, 23, 1, "New Starting Address: x");
                     refresh();
-                    scanf("%4X", &newStart);
+                    wgetstr(main_win, &inStart);
+                    newStart = strtol(inStart, NULL, 16);
                     displayCPU(cpu, newStart);
                     //printf("CASE5\n"); // Update the window for the memory registers.
                     break;
