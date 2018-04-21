@@ -4,7 +4,7 @@
  *  Date Due: Apr 22, 2018
  *  Authors:  Sam Brendel, Tyler Shupack
  *  Problem 3,4
- *  version: 4.21a
+ *  version: 4.21b
  */
 
 #include "slc3.h"
@@ -456,8 +456,14 @@ void displayCPU(CPU_p *cpu, int memStart) {
                     mvwprintw(main_win, 23, 1, "New Starting Address: x");
                     refresh();
                     wgetstr(main_win, &inStart);
-                    newStart = strtol(inStart, NULL, 16);
-                    displayCPU(cpu, newStart);
+                    if (hexCheck(inStart)) {
+                        newStart = strtol(inStart, NULL, 16);
+                        displayCPU(cpu, newStart);
+                    } else {
+                        mvwprintw(main_win, 24, 1, "You must enter a 4-digit hex value. Try again.");
+                        refresh();
+                        rePromptUser = true;
+                    }
                     //printf("CASE5\n"); // Update the window for the memory registers.
                     break;
                 case '9':
@@ -476,6 +482,25 @@ void displayCPU(CPU_p *cpu, int memStart) {
             }
             wrefresh(main_win);
         }
+    }
+}
+/**
+ * A function to check the validity of a hex number.
+ */
+int hexCheck(char num[]) {
+    int counter = 0;
+    int valid = 0;
+    int i;
+
+    for (i = 0; i < 4; i++) {
+        if (isxdigit(num[i])) {
+            counter++;
+        }
+    }
+    if (counter == 4) {
+        return 1;
+    } else {
+        return 0;
     }
 }
 /**
@@ -575,7 +600,7 @@ void loadProgramInstructions(FILE *inputFile) {
             //printf("\n---ERROR, no instructions were loaded in memory!\n\n");
             // This should not happen, but here at least for debugging.
         }
-        }
+    }
 }
 
 /**

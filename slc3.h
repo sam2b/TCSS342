@@ -87,5 +87,6 @@ bool doBen(unsigned short, CPU_p *);
 void displayHeader();
 FILE* openFileText(char *);
 void loadProgramInstructions(FILE *);
+int hexCheck(char num[]);
 
 #endif /* SLC3_H_ */
