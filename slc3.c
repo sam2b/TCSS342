@@ -4,7 +4,7 @@
  *  Date Due: Apr 22, 2018
  *  Authors:  Sam Brendel, Tyler Shupack
  *  Problem 3,4
- *  version: 4.22b
+ *  version: 4.22c
  */
 
 #include "slc3.h"
@@ -13,6 +13,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <ncurses.h>
+#include <ctype.h>
 
 unsigned short memory[MEMORY_SIZE];
 bool isHalted = false;
@@ -412,7 +413,7 @@ void displayCPU(CPU_p *cpu, int memStart) {
         int menuSelection = 0;
         int newStart = 0;
         char inStart[4];
-        char *fileName[FILENAME_SIZE];
+        char fileName[FILENAME_SIZE];
         mvwprintw(main_win, 1, 1, "Welcome to the LC-3 Simulator Simulator");
         mvwprintw(main_win, 2, 1, "Registers");
         mvwprintw(main_win, 2, 31, "Memory");
@@ -469,6 +470,9 @@ void displayCPU(CPU_p *cpu, int memStart) {
                     refresh();
                     wgetstr(main_win, fileName);
                     loadProgramInstructions(openFileText(fileName));
+                    CPU_p cpuTemp = initialize();
+                    cpu = &cpuTemp;
+                    refresh();
                     break;
                 case '3':
                     //printf("CASE3\n"); // do nothing.  Just let the PC run the next instruction.
@@ -478,9 +482,9 @@ void displayCPU(CPU_p *cpu, int memStart) {
                     while (rePromptHex) {
                         mvwprintw(main_win, 23, 1, "Push Q to return to main menu.");
                         mvwprintw(main_win, 24, 1, "New Starting Address: x");
-                        wgetstr(main_win, &inStart);
+                        wgetstr(main_win, inStart);
                         refresh();
-                        if (inStart[0] == 'q' || inStart == 'Q') {
+                        if (inStart[0] == 'q' || inStart[0] == 'Q') {
                             mvwprintw(main_win, 25, 1, "Returning to main menu.");
                             rePromptUser = true;
                             break;
@@ -520,33 +524,21 @@ void displayCPU(CPU_p *cpu, int memStart) {
  * A function to check the validity of a hex number.
  * Returns 1 if true, 0 if false.
  */
-int hexCheck(char array[]) {
+int hexCheck(char num[]) {
     int counter = 0;
     int valid = 0;
     int i;
-    int elementQuantity = 0;
-    int result = 1;
 
-    if (sizeof array > 0) {
-        // The entire quantity of bytes divided by one of its elements.
-        elementQuantity = sizeof array / sizeof array[0];
-    }
-
-    for (i = 0; i < elementQuantity; i++) {
-        if (isxdigit(array[i])) {
+    for (i = 0; i < 4; i++) {
+        if (isxdigit(num[i])) {
             counter++;
-        } else {
-            return 0; // As soon as any character is not a hex digit, return 0.
         }
     }
-
-    // Restricted to 4 hex bits for our 16 bit architecture.
-    if (counter > 0 && counter <= MAX_HEX_BITS) {
-        result = 1;
+    if (counter == 4) {
+        return 1;
     } else {
-        result = 0;
+        return 0;
     }
-    return result;
 }
 /**
  * Sets all elements to zero.
