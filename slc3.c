@@ -395,6 +395,7 @@ unsigned short ZEXT(unsigned short value) {
 void displayCPU(CPU_p *cpu, int memStart) {
 
     int c;
+    int hexExit;
 
     initscr();
     cbreak();
@@ -407,6 +408,7 @@ void displayCPU(CPU_p *cpu, int memStart) {
     while(1) {
 
         bool rePromptUser = true;
+        bool rePromptHex = true;
         int menuSelection = 0;
         int newStart = 0;
         char inStart[4];
@@ -453,7 +455,7 @@ void displayCPU(CPU_p *cpu, int memStart) {
         while(rePromptUser) {
             rePromptUser = false;
             c = wgetch(main_win);
-            mvwprintw(main_win, 23, 1, "Input: %c", c);
+            mvwprintw(main_win, 22, 1, "Input: %c", c);
             refresh();
             switch(c){
                 case '1':
@@ -467,16 +469,25 @@ void displayCPU(CPU_p *cpu, int memStart) {
                     controller(cpu); // invoke exclusively in case 3.
                     break;
                 case '5':
-                    mvwprintw(main_win, 23, 1, "New Starting Address: x");
-                    refresh();
-                    wgetstr(main_win, &inStart);
-                    if (hexCheck(inStart)) {
-                        newStart = strtol(inStart, NULL, MAX_BIN_BITS);
-                        displayCPU(cpu, newStart);
-                    } else {
-                        mvwprintw(main_win, 24, 1, "You must enter a 4-digit hex value. Try again.");
+                    while (rePromptHex) {
+                        mvwprintw(main_win, 23, 1, "Push Q to return to main menu.");
+                        mvwprintw(main_win, 24, 1, "New Starting Address: x");
+                        wgetstr(main_win, &inStart);
                         refresh();
-                        rePromptUser = true;
+                        if (inStart[0] == 'q' || inStart == 'Q') {
+                            mvwprintw(main_win, 25, 1, "Returning to main menu.");
+                            rePromptUser = true;
+                            break;
+                        }
+                        if (hexCheck(inStart)) {
+                            newStart = strtol(inStart, NULL, MAX_BIN_BITS);
+                            displayCPU(cpu, newStart);
+                        } else {
+                            mvwprintw(main_win, 24, 1, "You must enter a 4-digit hex value.");
+                            mvwprintw(main_win, 25, 1, "Try again.");
+                            refresh();
+                            rePromptHex = true;
+                        }
                     }
                     //printf("CASE5\n"); // Update the window for the memory registers.
                     break;
@@ -488,7 +499,7 @@ void displayCPU(CPU_p *cpu, int memStart) {
                     exit(0);
                     break;
                 default:
-                    mvwprintw(main_win, 23, 1, "---Invalid selection\n.");
+                    mvwprintw(main_win, 24, 1, "---Invalid selection.");
                     refresh();
                     rePromptUser = true;
                     break;
