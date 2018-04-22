@@ -4,7 +4,7 @@
  *  Date Due: Apr 22, 2018
  *  Authors:  Sam Brendel, Tyler Shupack
  *  Problem 3,4
- *  version: 4.22c
+ *  version: 4.22d
  */
 
 #include "slc3.h"
@@ -407,13 +407,12 @@ void displayCPU(CPU_p *cpu, int memStart) {
     refresh();
 
     while(1) {
-
         bool rePromptUser = true;
         bool rePromptHex = true;
         int menuSelection = 0;
         int newStart = 0;
         char inStart[4];
-        char fileName[FILENAME_SIZE];
+        char *fileName = malloc(FILENAME_SIZE * sizeof(char)); //char fileName[FILENAME_SIZE];
         mvwprintw(main_win, 1, 1, "Welcome to the LC-3 Simulator Simulator");
         mvwprintw(main_win, 2, 1, "Registers");
         mvwprintw(main_win, 2, 31, "Memory");
@@ -455,6 +454,7 @@ void displayCPU(CPU_p *cpu, int memStart) {
 
         while(rePromptUser) {
             rePromptUser = false;
+            CPU_p cpuTemp;
             move(23, 1);
             clrtoeol();
             move(24, 1);
@@ -466,12 +466,13 @@ void displayCPU(CPU_p *cpu, int memStart) {
             refresh();
             switch(c){
                 case '1':
+                    cpuTemp = initialize();
+                    cpu = &cpuTemp;
                     mvwprintw(main_win, 23, 1, "Specify file name: ");
                     refresh();
                     wgetstr(main_win, fileName);
                     loadProgramInstructions(openFileText(fileName));
-                    CPU_p cpuTemp = initialize();
-                    cpu = &cpuTemp;
+                    free(fileName);
                     refresh();
                     break;
                 case '3':
@@ -582,6 +583,7 @@ CPU_p initialize() {
  * @return the pointer to the file now opened.
  */
 FILE* openFileText(char *theFileName) {
+    //printf("You said %s", theFileName); // debugging, remove me.
     FILE *dataFile;
     dataFile = fopen(theFileName, "r");
     //if ((dataFile = fopen(theFileName, "r")) == NULL) {
@@ -620,24 +622,21 @@ void loadProgramInstructions(FILE *inputFile) {
             fgets(instruction, length, inputFile); // processes the carriage return character.
         }
 
-        // In this simulator, we start 0x3000 is the zero'th element in memory[].
-        if (startingAddress >= 0x3000) {
-            i = (startingAddress - 0x3000);
-        while(!feof(inputFile)) {
-            fgets(instruction, length, inputFile);
-            memory[i++] = strtol(instruction, NULL, MAX_BIN_BITS);
+        // In this simulator, we start at ADDRESS_MIN which is the zero'th element in memory[].
+        if (startingAddress >= ADDRESS_MIN) {
+            i = (startingAddress - ADDRESS_MIN);
+            while(!feof(inputFile)) {
+                fgets(instruction, length, inputFile);
+                memory[i] = strtol(instruction, NULL, MAX_BIN_BITS);
+                //printf("\n %04X", memory[i]); // debugging, confirms the memory[] does have the data.
                 fgets(instruction, length, inputFile); // processes the carriage return character.
-        }
+                i++;
+                }
         } else {
             printf("Error, starting adddress must be between %x and %x\n"
                     , ADDRESS_MIN, (ADDRESS_MIN + MEMORY_SIZE));
         }
         fclose(inputFile);
-
-        if (memory[0] == 0) {
-            //printf("\n---ERROR, no instructions were loaded in memory!\n\n");
-            // This should not happen, but here at least for debugging.
-        }
     }
 }
 
@@ -645,8 +644,7 @@ void loadProgramInstructions(FILE *inputFile) {
  * Driver for the program.
  */
 int main(int argc, char* argv[]) {
-
-    char *fileName = argv[1];
+    char *fileName = argv[1]; //char *fileName = "./HW3.hex";
     CPU_p cpu = initialize();
     FILE *theFile = openFileText(fileName);
     if(theFile != NULL) {
