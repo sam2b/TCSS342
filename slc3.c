@@ -4,7 +4,7 @@
  *  Date Due: Apr 22, 2018
  *  Authors:  Sam Brendel, Tyler Shupack
  *  Problem 3,4
- *  version: 4.22a
+ *  version: 4.22b
  */
 
 #include "slc3.h"
@@ -454,6 +454,12 @@ void displayCPU(CPU_p *cpu, int memStart) {
 
         while(rePromptUser) {
             rePromptUser = false;
+            move(23, 1);
+            clrtoeol();
+            move(24, 1);
+            clrtoeol();
+            move(25, 1);
+            clrtoeol();
             c = wgetch(main_win);
             mvwprintw(main_win, 22, 1, "Input: %c", c);
             refresh();
