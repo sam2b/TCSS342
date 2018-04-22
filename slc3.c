@@ -4,7 +4,7 @@
  *  Date Due: Apr 22, 2018
  *  Authors:  Sam Brendel, Tyler Shupack
  *  Problem 3,4
- *  version: 4.21b
+ *  version: 4.21c
  */
 
 #include "slc3.h"
@@ -25,7 +25,7 @@ bool isHalted = false;
  */
 void trap(unsigned short vector, CPU_p *cpu) {
     switch (vector) {
-    case 0x25:
+    case TRAP_VECTOR_X25:
         printf("==========HALT==========\n");
         cpu->pc = 0; // reset to zero as per Prof Mobus.
         isHalted = true;
@@ -44,13 +44,13 @@ int controller(CPU_p *cpu) {
 
     // check to make sure both pointers are not NULL
     // do any initializations here
-    unsigned int opcode, dr, sr1, sr2, bit5, immed, offset, state, nzp;    // fields for the IR
+    unsigned int opcode, dr, sr1, sr2, bit5, offset, state, nzp;    // fields for the IR
+    unsigned short immed; // before using this value, blahblah = SEXTimmed(immed);
     unsigned short vector8, vector16;
     bool isCycleComplete = false;
-    short signedShort = 0;
 
     state = FETCH;
-    while (!isHalted) { // efficient endless loop to be used in the next problem
+    while (!isHalted) {
         switch (state) {
             case FETCH: // microstates 18, 33, 35 in the book.
                 //printf("Now in FETCH---------------\n");
@@ -133,7 +133,7 @@ int controller(CPU_p *cpu) {
                     dr      = cpu->ir & MASK_DR;
                     dr      = dr     >> BITSHIFT_DR;
                     offset  = cpu->ir & MASK_PCOFFSET9;
-                    offset  = SEXT(offset);
+                    offset  = toSign(offset);
                     cpu->mar = cpu->pc + offset;
                     cpu->mdr = memory[cpu->mar];
                     break;
@@ -163,7 +163,7 @@ int controller(CPU_p *cpu) {
                     if (bit5 == 0) {
                         cpu->mdr = cpu->reg[sr2] + cpu->reg[sr1];
                     } else if (bit5 == 1) {
-                        cpu->mdr = cpu->reg[sr1] + immed;
+                        cpu->mdr = cpu->reg[sr1] + SEXTimmed(immed);
                     }
                     cpu->cc = getCC(cpu->mdr); // TODO should this be set in this phase?
                     break;
@@ -171,7 +171,7 @@ int controller(CPU_p *cpu) {
                     if (bit5 == 0) {
                         cpu->mdr = cpu->reg[sr2] & cpu->reg[sr1];
                     } else if (bit5 == 1) {
-                        cpu->mdr = cpu->reg[sr1] & immed;
+                        cpu->mdr = cpu->reg[sr1] & SEXTimmed(immed);
                     }
                     cpu->cc = getCC(cpu->mdr); // TODO should this be set in this phase?
                     break;
@@ -208,7 +208,8 @@ int controller(CPU_p *cpu) {
             case OP_ADD:
             case OP_AND: // Same as ADD
             case OP_NOT: // Sam as AND and AND.
-                cpu->reg[dr] = cpu->mdr;
+                //cpu->reg[dr] = cpu->mdr;
+                cpu->reg[dr] = toSign(cpu->mdr);
                 break;
             case OP_LD:
                 cpu->reg[dr] = cpu->mdr; // Load into the register.
@@ -226,6 +227,10 @@ int controller(CPU_p *cpu) {
             state = FETCH;
             break;
         } // end switch (state)
+
+        if (isHalted) {
+            cpu->pc = 0;
+        }
 
         if (isHalted || isCycleComplete) {
            break;
@@ -275,9 +280,16 @@ void JUMP(CPU_p *cpu, unsigned short whereTo) {
 /**
  * This returns the same value except it is converted to a signed short instead.
  */
-short SEXT(unsigned short value) {
+short toSign(unsigned short value) {
     short signedValue = value;
     return signedValue;
+}
+
+short SEXTimmed(unsigned short value) {
+    if((value & NEGATIVE_IMMEDIATE >> BITSHIFT_NEGATIVE_IMMEDIATE) == 1) {
+        return value | MASK_NEGATIVE_IMMEDIATE;
+    }
+    return (short)value;
 }
 
 /**
@@ -288,10 +300,7 @@ unsigned short ZEXT(unsigned short value) {
     return value;
 }
 
-/**
- * Print out fields to the console for the CPU_p object.
- * @param cpu the cpu object containing the data.
- */
+// OLD FUNCTION BEFORE IMPLEMENTING NCURSES.
 /*void displayCPU(CPU_p *cpu, int memStart) {
     for(;;) {
         //printf("---displayCPU()\n"); // debugging
@@ -299,6 +308,8 @@ unsigned short ZEXT(unsigned short value) {
         int menuSelection = 0;
         int newStart = 0;
         char *fileName[FILENAME_SIZE];
+        unsigned short tempMar = 0;
+        //printf("isHalted=%d  ", isHalted);
         printf("Welcome to the LC-3 Simulator Simulator\n");
         printf("Registers                     Memory\n");
 
@@ -306,33 +317,33 @@ unsigned short ZEXT(unsigned short value) {
         int i = 0;
         for(i = 0; i < 8; i++) {
             printf("R%u: x%04X", i, cpu->reg[i]);   // Registers.
-            printf("                  x%04X: x%04X\n", i+memStart, memory[i]); // Memory.
+            printf("                  x%04X: x%04X\n", i+memStart, memory[i + (memStart - ADDRESS_MIN)]); // Memory.
         }
 
         // Next 3 lines
         int j;
-        for (j = 0; j < 3; j++ & i++) {
-            printf("                           x%04X: x%04X\n", i+memStart, memory[i]);
+        for (j = 0; j < 3; j++) {
+            printf("                           x%04X: x%04X\n", i+memStart, memory[i + (memStart - ADDRESS_MIN)]);
+            i++;
         }
 
         // Next 4 lines.
-        if (cpu->pc == 0) {
-            cpu->mar = 0;
-        } else {
-            cpu->mar += ADDRESS_MIN;
-        }
-        printf("PC:  x%04X    IR: x%04X    x%04X: x%04X\n", cpu->pc+ADDRESS_MIN, cpu->ir, i+memStart, memory[i]);
-        printf("A:   x%04X     B: x%04X    x%04X: x%04X\n", cpu->A, cpu->B, i+memStart, memory[i++]);
-        printf("MAR: x%04X   MDR: x%04X    x%04X: x%04X\n", cpu->mar, cpu->ir, i+memStart, memory[i++]);
+        printf("PC:  x%04X    IR: x%04X    x%04X: x%04X\n", cpu->pc+ADDRESS_MIN, cpu->ir, i+memStart, memory[i + (memStart - ADDRESS_MIN)]);
+        i++;
+        printf("A:   x%04X     B: x%04X    x%04X: x%04X\n", cpu->A, cpu->B, i+memStart, memory[i + (memStart - ADDRESS_MIN)]);
+        i++;
+        printf("MAR: x%04X   MDR: x%04X    x%04X: x%04X\n", cpu->mar+ADDRESS_MIN, cpu->ir, i+memStart, memory[i + (memStart - ADDRESS_MIN)]);
+        i++;
         printf("CC:  N:%d Z:%d P:%d           x%04X: x%04X\n",
                 cpu->cc >> BITSHIFT_CC_BIT3 & MASK_CC_N,
                 cpu->cc >> BITSHIFT_CC_BIT2 & MASK_CC_Z,
                 cpu->cc  & MASK_CC_P,
                 i+ADDRESS_MIN,
-                memory[i++]);
+                memory[i + (memStart - ADDRESS_MIN)]);
 
+        i++;
         // Last 2 lines.
-        printf("                           x%04X: x%04X\n", i+memStart, memory[i++]);
+        printf("                           x%04X: x%04X\n", i+memStart, memory[i + (memStart - ADDRESS_MIN)]);
         while(rePromptUser) {
             rePromptUser = false;
             printf("Select: 1) Load,  3) Step,  5) Display Mem,  9) Exit\n");
@@ -376,6 +387,11 @@ unsigned short ZEXT(unsigned short value) {
     }
 }*/
 
+
+/**
+ * Print out fields to the console for the CPU_p object.
+ * @param cpu the cpu object containing the data.
+ */
 void displayCPU(CPU_p *cpu, int memStart) {
 
     int c;
@@ -403,33 +419,33 @@ void displayCPU(CPU_p *cpu, int memStart) {
         int i = 0;
         for(i = 0; i < 8; i++) {
             mvwprintw(main_win, 3+i, 1, "R%u: x%04X", i, cpu->reg[i]);   // Registers.
-            mvwprintw(main_win, 3+i, 28, "x%04X: x%04X", i+memStart, memory[i]); // Memory.
+            mvwprintw(main_win, 3+i, 28, "x%04X: x%04X", i+memStart, memory[i + (memStart - ADDRESS_MIN)]); // Memory.
         }
 
         // Next 3 lines
         int j = 0;
-        for (j = 0; j < 3; j++ & i++) {
-            mvwprintw(main_win, 11+j, 28, "x%04X: x%04X", i+memStart, memory[i]);
+        for (j = 0; j < 3; j++) {
+            mvwprintw(main_win, 11+j, 28, "x%04X: x%04X", i+memStart, memory[i + (memStart - ADDRESS_MIN)]);
+            i++;
         }
 
         // Next 4 lines.
-        if (cpu->pc == 0) {
-            cpu->mar = 0;
-        } else {
-            cpu->mar += ADDRESS_MIN;
-        }
-        mvwprintw(main_win, 14, 1, "PC:  x%04X    IR: x%04X    x%04X: x%04X", cpu->pc+ADDRESS_MIN, cpu->ir, i+memStart, memory[i]);
-        mvwprintw(main_win, 15, 1, "A:   x%04X     B: x%04X    x%04X: x%04X", cpu->A, cpu->B, i+memStart, memory[i++]);
-        mvwprintw(main_win, 16, 1, "MAR: x%04X   MDR: x%04X    x%04X: x%04X", cpu->mar, cpu->ir, i+memStart, memory[i++]);
+        mvwprintw(main_win, 14, 1, "PC:  x%04X    IR: x%04X    x%04X: x%04X", cpu->pc+ADDRESS_MIN, cpu->ir, i+memStart, memory[i + (memStart - ADDRESS_MIN)]);
+        i++;
+        mvwprintw(main_win, 15, 1, "A:   x%04X     B: x%04X    x%04X: x%04X", cpu->A, cpu->B, i+memStart, memory[i + (memStart - ADDRESS_MIN)]);
+        i++;
+        mvwprintw(main_win, 16, 1, "MAR: x%04X   MDR: x%04X    x%04X: x%04X", cpu->mar+ADDRESS_MIN, cpu->ir, i+memStart, memory[i + (memStart - ADDRESS_MIN)]);
+        i++;
         mvwprintw(main_win, 17, 1, "CC:  N:%d Z:%d P:%d           x%04X: x%04X",
                 cpu->cc >> BITSHIFT_CC_BIT3 & MASK_CC_N,
                 cpu->cc >> BITSHIFT_CC_BIT2 & MASK_CC_Z,
                 cpu->cc  & MASK_CC_P,
                 i+ADDRESS_MIN,
-                memory[i++]);
+                memory[i + (memStart - ADDRESS_MIN)]);
 
+        i++;
         // Last 2 lines.
-        mvwprintw(main_win, 18, 28, "x%04X: x%04X", i+memStart, memory[i++]);
+        mvwprintw(main_win, 18, 28, "x%04X: x%04X", i+memStart, memory[i + (memStart - ADDRESS_MIN)]);
         mvwprintw(main_win, 19, 1, "Select: 1) Load,         3) Step");  
         mvwprintw(main_win, 20, 9, "5) Display Mem,  9) Exit");
         mvwprintw(main_win, 21, 1, " ------------------------------------- ");
@@ -457,7 +473,7 @@ void displayCPU(CPU_p *cpu, int memStart) {
                     refresh();
                     wgetstr(main_win, &inStart);
                     if (hexCheck(inStart)) {
-                        newStart = strtol(inStart, NULL, 16);
+                        newStart = strtol(inStart, NULL, MAX_BIN_BITS);
                         displayCPU(cpu, newStart);
                     } else {
                         mvwprintw(main_win, 24, 1, "You must enter a 4-digit hex value. Try again.");
@@ -484,24 +500,39 @@ void displayCPU(CPU_p *cpu, int memStart) {
         }
     }
 }
+
+
 /**
  * A function to check the validity of a hex number.
+ * Returns 1 if true, 0 if false.
  */
-int hexCheck(char num[]) {
+int hexCheck(char array[]) {
     int counter = 0;
     int valid = 0;
     int i;
+    int elementQuantity = 0;
+    int result = 1;
 
-    for (i = 0; i < 4; i++) {
-        if (isxdigit(num[i])) {
+    if (sizeof array > 0) {
+        // The entire quantity of bytes divided by one of its elements.
+        elementQuantity = sizeof array / sizeof array[0];
+    }
+
+    for (i = 0; i < elementQuantity; i++) {
+        if (isxdigit(array[i])) {
             counter++;
+        } else {
+            return 0; // As soon as any character is not a hex digit, return 0.
         }
     }
-    if (counter == 4) {
-        return 1;
+
+    // Restricted to 4 hex bits for our 16 bit architecture.
+    if (counter > 0 && counter <= MAX_HEX_BITS) {
+        result = 1;
     } else {
-        return 0;
+        result = 0;
     }
+    return result;
 }
 /**
  * Sets all elements to zero.
@@ -556,6 +587,7 @@ FILE* openFileText(char *theFileName) {
         temp = getchar(); // BUG this does not work as expected in option #1.
         printf("\n");
     } else {
+        isHalted = false;
         //printf("\nSUCCESS: File Found: %s\n\n", theFileName); // debugging
     }
     return dataFile;
@@ -578,7 +610,7 @@ void loadProgramInstructions(FILE *inputFile) {
            a result of the .ORIG instruction in assembly. */
         if(!feof(inputFile)) {
             fgets(instruction, length, inputFile);
-            startingAddress = strtol(instruction, NULL, 16);
+            startingAddress = strtol(instruction, NULL, MAX_BIN_BITS);
             fgets(instruction, length, inputFile); // processes the carriage return character.
         }
 
@@ -587,7 +619,7 @@ void loadProgramInstructions(FILE *inputFile) {
             i = (startingAddress - 0x3000);
         while(!feof(inputFile)) {
             fgets(instruction, length, inputFile);
-            memory[i++] = strtol(instruction, NULL, 16);
+            memory[i++] = strtol(instruction, NULL, MAX_BIN_BITS);
                 fgets(instruction, length, inputFile); // processes the carriage return character.
         }
         } else {

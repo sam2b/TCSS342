@@ -4,7 +4,7 @@
  *  Date Due: Apr 22, 2018
  *  Authors:  Sam Brendel, Tyler Shupack
  *  Problem 3,4
- *  version: 4.19a
+ *  version: 4.21c
  */
 #include <stdio.h>
 #include <stdbool.h>
@@ -15,6 +15,8 @@
 #define MEMORY_SIZE         100
 #define FILENAME_SIZE       200
 #define ADDRESS_MIN      0x3000
+#define MAX_HEX_BITS          4
+#define MAX_BIN_BITS         16
 
 #define FETCH     0
 #define DECODE    1
@@ -44,6 +46,7 @@
 #define MASK_CC_N        7
 #define MASK_CC_Z        5
 #define MASK_CC_P        1
+#define MASK_NEGATIVE_IMMEDIATE 0xFFE0 //1111 1111 1110 0000
 
 #define CONDITION_N   4 // 0000 1000 0000 0000
 #define CONDITION_Z   2 // 0000 0100 0000 0000
@@ -53,6 +56,7 @@
 #define CONDITION_ZP  3 // 0000 0110 0000 0000
 #define CONDITION_NZP 7 // 0000 1110 0000 0000
 
+// How many times to shift the bits.
 #define BITSHIFT_OPCODE 12
 #define BITSHIFT_DR      9
 #define BITSHIFT_CC      9
@@ -60,6 +64,11 @@
 #define BITSHIFT_BIT5    5
 #define BITSHIFT_CC_BIT3 2
 #define BITSHIFT_CC_BIT2 1
+#define BITSHIFT_NEGATIVE_IMMEDIATE 4
+
+#define TRAP_VECTOR_X25  0x25
+
+#define NEGATIVE_IMMEDIATE 16 //0000 0000 0001 0000
 
 struct CPUType {
 	unsigned short int pc;     // program counter.
@@ -80,7 +89,8 @@ void displayCPU(CPU_p *, int);
 void zeroOut(unsigned short *array, int);
 CPU_p initialize();
 unsigned short ZEXT(unsigned short);
-short SEXT(unsigned short);
+short toSign(unsigned short);
+short SEXTimmed(unsigned short);
 void TRAP(unsigned short, CPU_p *);
 unsigned short getCC(unsigned short);
 bool doBen(unsigned short, CPU_p *);
