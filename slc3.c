@@ -4,7 +4,7 @@
  *  Date Due: Apr 22, 2018
  *  Authors:  Sam Brendel, Tyler Shupack
  *  Problem 3,4
- *  version: 4.21c
+ *  version: 4.22a
  */
 
 #include "slc3.h"
@@ -450,13 +450,11 @@ void displayCPU(CPU_p *cpu, int memStart) {
         mvwprintw(main_win, 20, 9, "5) Display Mem,  9) Exit");
         mvwprintw(main_win, 21, 1, " ------------------------------------- ");
 
-        c = wgetch(main_win);
-
-        mvwprintw(main_win, 23, 1, "Input: %c", c);
-        refresh();
-
         while(rePromptUser) {
             rePromptUser = false;
+            c = wgetch(main_win);
+            mvwprintw(main_win, 23, 1, "Input: %c", c);
+            refresh();
             switch(c){
                 case '1':
                     mvwprintw(main_win, 23, 1, "Specify file name: ");
@@ -485,9 +483,8 @@ void displayCPU(CPU_p *cpu, int memStart) {
                 case '9':
                     //printf("CASE9\n");
                     //cpu->IR = 0xF025; // TRAP x25
-                    mvwprintw(main_win, 23, 1, "\nBubye\n");
-                    refresh();
                     endwin();
+                    printf("Bubye\n");
                     exit(0);
                     break;
                 default:
