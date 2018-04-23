@@ -4,7 +4,7 @@
  *  Date Due: Apr 22, 2018
  *  Authors:  Sam Brendel, Tyler Shupack
  *  Problem 3,4
- *  version: 4.22d
+ *  version: 4.22e
  */
 
 #include "slc3.h"
@@ -588,7 +588,7 @@ FILE* openFileText(char *theFileName) {
     dataFile = fopen(theFileName, "r");
     //if ((dataFile = fopen(theFileName, "r")) == NULL) {
     if (dataFile == NULL) {
-//        printf("\n---ERROR: File %s could not be opened.\n\n", theFileName);
+    //  printf("\n---ERROR: File %s could not be opened.\n\n", theFileName);
         char temp;
         printf("Error, File not found.  Press <ENTER> to continue.", theFileName);
         fflush(stdin);
@@ -646,8 +646,8 @@ void loadProgramInstructions(FILE *inputFile) {
 int main(int argc, char* argv[]) {
     char *fileName = argv[1]; //char *fileName = "./HW3.hex";
     CPU_p cpu = initialize();
-    FILE *theFile = openFileText(fileName);
-    if(theFile != NULL) {
+    if(fileName != NULL) {
+        FILE *theFile = openFileText(fileName);
         loadProgramInstructions(openFileText(fileName));
     }
     displayCPU(&cpu, ADDRESS_MIN); // send the address of the object.
