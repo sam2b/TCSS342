@@ -402,7 +402,7 @@ void displayCPU(CPU_p *cpu, int memStart) {
     cbreak();
     clear();
 
-    WINDOW *main_win = newwin(28, 41, 0, 0);
+    WINDOW *main_win = newwin(32, 49, 0, 0);
     box(main_win, 0, 0);
     refresh();
 
@@ -448,31 +448,36 @@ void displayCPU(CPU_p *cpu, int memStart) {
         i++;
         // Last 2 lines.
         mvwprintw(main_win, 18, 28, "x%04X: x%04X", i+memStart, memory[i + (memStart - ADDRESS_MIN)]);
-        mvwprintw(main_win, 19, 1, "Select: 1) Load,         3) Step");  
-        mvwprintw(main_win, 20, 9, "5) Display Mem,  9) Exit");
-        mvwprintw(main_win, 21, 1, " ------------------------------------- ");
+        mvwprintw(main_win, 19, 1, "Select: 1) Load 3) Step 5) Display Mem  9) Exit");
+        mvwprintw(main_win, 25, 1, " --------------------------------------------- ");
 
         while(rePromptUser) {
             rePromptUser = false;
             CPU_p cpuTemp;
+            move(21, 1);
+            clrtoeol();
+            move(22, 1);
+            clrtoeol();
             move(23, 1);
             clrtoeol();
             move(24, 1);
             clrtoeol();
-            move(25, 1);
-            clrtoeol();
+            noecho();
             c = wgetch(main_win);
-            mvwprintw(main_win, 22, 1, "Input: %c", c);
+            echo();
+            box(main_win, 0, 0);
+            mvwprintw(main_win, 20, 1, "Input: %c", c);
             refresh();
             switch(c){
                 case '1':
                     cpuTemp = initialize();
                     cpu = &cpuTemp;
-                    mvwprintw(main_win, 23, 1, "Specify file name: ");
+                    mvwprintw(main_win, 21, 1, "Specify file name: ");
                     refresh();
                     wgetstr(main_win, fileName);
                     loadProgramInstructions(openFileText(fileName));
                     free(fileName);
+                    box(main_win, 0, 0);
                     refresh();
                     break;
                 case '3':
@@ -481,12 +486,13 @@ void displayCPU(CPU_p *cpu, int memStart) {
                     break;
                 case '5':
                     while (rePromptHex) {
-                        mvwprintw(main_win, 23, 1, "Push Q to return to main menu.");
-                        mvwprintw(main_win, 24, 1, "New Starting Address: x");
+                        mvwprintw(main_win, 21, 1, "Push Q to return to main menu.");
+                        mvwprintw(main_win, 22, 1, "New Starting Address: x");
                         wgetstr(main_win, inStart);
+                        box(main_win, 0, 0);
                         refresh();
                         if (inStart[0] == 'q' || inStart[0] == 'Q') {
-                            mvwprintw(main_win, 25, 1, "Returning to main menu.");
+                            mvwprintw(main_win, 23, 1, "Returning to main menu.");
                             rePromptUser = true;
                             break;
                         }
@@ -494,8 +500,7 @@ void displayCPU(CPU_p *cpu, int memStart) {
                             newStart = strtol(inStart, NULL, MAX_BIN_BITS);
                             displayCPU(cpu, newStart);
                         } else {
-                            mvwprintw(main_win, 24, 1, "You must enter a 4-digit hex value.");
-                            mvwprintw(main_win, 25, 1, "Try again.");
+                            mvwprintw(main_win, 24, 1, "You must enter a 4-digit hex value. Try again.");
                             refresh();
                             rePromptHex = true;
                         }
@@ -510,7 +515,7 @@ void displayCPU(CPU_p *cpu, int memStart) {
                     exit(0);
                     break;
                 default:
-                    mvwprintw(main_win, 24, 1, "---Invalid selection.");
+                    mvwprintw(main_win, 21, 1, "---Invalid selection.");
                     refresh();
                     rePromptUser = true;
                     break;
