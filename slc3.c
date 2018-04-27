@@ -1,10 +1,10 @@
 /*
  *  slc3.c
  *
- *  Date Due: Apr 22, 2018
- *  Authors:  Sam Brendel, Tyler Shupack
- *  Problem 3,4
- *  version: 4.22e
+ *  Date Due: Apr 29, 2018
+ *  Authors:  Sam Brendel, Mike Josten
+ *  Problem 5
+ *  version: 4.27a
  */
 
 #include "slc3.h"
@@ -19,20 +19,29 @@ unsigned short memory[MEMORY_SIZE];
 bool isHalted = false;
 
 /**
- * Simulates trap table lookup for now
+ * Simulates trap table lookup.
  * @param vector the area in memory that is simulated to be looked up to
  *        execute the requested TRAP routine.
  * @param cpu the cpu object that contains data.
  */
-void trap(unsigned short vector, CPU_p *cpu) {
+void trap(unsigned short vector, CPU_p *cpu, WINDOW *theWindow) {
     switch (vector) {
+    case TRAP_VECTOR_X20:
+        printf(" ");
+        break;
+    case TRAP_VECTOR_X21:
+        printf(" ");
+        break;
+    case TRAP_VECTOR_X22:
+        printf(" ");
+        break;
     case TRAP_VECTOR_X25:
-        printf("==========HALT==========\n");
+        cursorAtPrompt(theWindow, "==========HALT==========");
         cpu->pc = 0; // reset to zero as per Prof Mobus.
         isHalted = true;
         break;
     default: 
-        printf("Err: Unknown Trap vector?\n");
+        cursorAtPrompt(theWindow, "Error: Unknown Trap vector");
         break;
     }
 }
@@ -41,7 +50,7 @@ void trap(unsigned short vector, CPU_p *cpu) {
  * The controller component of the LC-3 simulator.
  * @param cpu the cpu object to contain data.
  */
-int controller(CPU_p *cpu) {
+int controller(CPU_p *cpu, WINDOW *theWindow) {
 
     // check to make sure both pointers are not NULL
     // do any initializations here
@@ -64,15 +73,14 @@ int controller(CPU_p *cpu) {
 
             case DECODE: // microstate 32
                 //printf("Now in DECODE---------------\n");
-                opcode = cpu->ir  & MASK_OPCODE; // Input is the four-bit opcode IR[15:12]. The output line asserted is the one corresponding to the opcode at the input.
-                opcode = opcode  >> BITSHIFT_OPCODE;
+                opcode = (cpu->ir & MASK_OPCODE) >> BITSHIFT_OPCODE; // Input is the four-bit opcode IR[15:12]. The output line asserted is the one corresponding to the opcode at the input.
+                //opcode = opcode  >> BITSHIFT_OPCODE;
                 switch (opcode) {
                 // different opcodes require different handling
                 // compute effective address, e.g. add sext(immed7) to register.
                 case OP_LD:
-                    dr     = cpu->ir >> BITSHIFT_DR;
-                    dr     = dr       & MASK_SR2;
-                    offset = cpu->ir  & MASK_PCOFFSET9;
+                    dr     = (cpu->ir >> BITSHIFT_DR) & MASK_SR2;
+                    offset = cpu->ir & MASK_PCOFFSET9;
                     break;
             }
             state = EVAL_ADDR;
@@ -92,10 +100,9 @@ int controller(CPU_p *cpu) {
                     cpu->mdr = memory[cpu->mar]; // microstate 25.
                     break;
                 case OP_ST:
-                    dr      = cpu->ir  & MASK_DR;         // This is actually a source register, but still use dr.
-                    dr      = dr     >> BITSHIFT_DR;
-                    offset  = cpu->ir  & MASK_PCOFFSET9;
-                    cpu->mar = cpu->pc  + offset; // microstate 2.
+                    dr       = (cpu->ir & MASK_DR) >> BITSHIFT_DR;         // This is actually a source register, but still use dr.
+                    offset   =  cpu->ir & MASK_PCOFFSET9;
+                    cpu->mar =  cpu->pc + offset; // microstate 2.
                     break;
             }
             state = FETCH_OP;
@@ -108,12 +115,9 @@ int controller(CPU_p *cpu) {
                 // or get memory for load instr.
                 case OP_ADD:
                 case OP_AND:
-                    dr   = cpu->ir  & MASK_DR;
-                    dr   = dr      >> BITSHIFT_DR;
-                    sr1  = cpu->ir  & MASK_SR1;
-                    sr1  = sr1     >> BITSHIFT_SR1;
-                    bit5 = cpu->ir  & MASK_BIT5;
-                    bit5 = bit5    >> BITSHIFT_BIT5;
+                    dr   = (cpu->ir & MASK_DR) >> BITSHIFT_DR;
+                    sr1  = (cpu->ir & MASK_SR1) >> BITSHIFT_SR1;
+                    bit5 = (cpu->ir & MASK_BIT5) >> BITSHIFT_BIT5;
                     if (bit5 == 0) {
                         sr2 = cpu->ir & MASK_SR2; // no shift needed.
                     } else if (bit5 == 1) {
@@ -122,17 +126,14 @@ int controller(CPU_p *cpu) {
                     // The book page 106 says current microprocessors can be done simultaneously during fetch, but this simulator is old skool.
                     break;
                 case OP_NOT:
-                    dr  = cpu->ir  & MASK_DR;
-                    dr  = dr      >> BITSHIFT_DR;
-                    sr1 = cpu->ir  & MASK_SR1;
-                    sr1 = sr1     >> BITSHIFT_SR1;
+                    dr  = (cpu->ir & MASK_DR) >> BITSHIFT_DR;
+                    sr1 = (cpu->ir & MASK_SR1) >> BITSHIFT_SR1;
                     break;
                 case OP_TRAP:
                     vector8 = cpu->ir & MASK_TRAPVECT8; // No shift needed.
                     break;
                 case OP_LD:
-                    dr      = cpu->ir & MASK_DR;
-                    dr      = dr     >> BITSHIFT_DR;
+                    dr      = (cpu->ir & MASK_DR) >> BITSHIFT_DR;
                     offset  = cpu->ir & MASK_PCOFFSET9;
                     offset  = toSign(offset);
                     cpu->mar = cpu->pc + offset;
@@ -143,12 +144,10 @@ int controller(CPU_p *cpu) {
                     cpu->mdr = cpu->reg[dr];
                     break;
                 case OP_JMP:
-                    sr1 = cpu->ir & MASK_SR1;
-                    sr1 = sr1    >> BITSHIFT_SR1;
+                    sr1 = (cpu->ir & MASK_SR1) >> BITSHIFT_SR1;
                     break;
                 case OP_BR:
-                    nzp = cpu->ir    & MASK_NZP;
-                    nzp = nzp       >> BITSHIFT_CC;
+                    nzp = (cpu->ir & MASK_NZP) >> BITSHIFT_CC;
                     offset = cpu->ir & MASK_PCOFFSET9;
                     break;
                 default:
@@ -187,7 +186,7 @@ int controller(CPU_p *cpu) {
                     cpu->reg[7] = cpu->pc; // Store the PC in R7 before loading PC with the starting address of the service routine.
                     cpu->mdr    = memory[cpu->mar]; // read the contents of the register.
                     cpu->pc     = cpu->mdr; // The contents of the MDR are loaded into the PC.  Load the PC with the starting address of the service routine.
-                    trap(vector8, cpu);
+                    trap(vector8, cpu, theWindow);
                     break;
                 case OP_JMP:
                     cpu->pc = cpu->reg[sr1];
@@ -208,7 +207,7 @@ int controller(CPU_p *cpu) {
             // write back to register or store MDR into memory
             case OP_ADD:
             case OP_AND: // Same as ADD
-            case OP_NOT: // Sam as AND and AND.
+            case OP_NOT: // Same as AND and AND.
                 //cpu->reg[dr] = cpu->mdr;
                 cpu->reg[dr] = toSign(cpu->mdr);
                 break;
@@ -287,7 +286,7 @@ short toSign(unsigned short value) {
 }
 
 short SEXTimmed(unsigned short value) {
-    if((value & NEGATIVE_IMMEDIATE >> BITSHIFT_NEGATIVE_IMMEDIATE) == 1) {
+    if(((value & NEGATIVE_IMMEDIATE) >> BITSHIFT_NEGATIVE_IMMEDIATE) == 1) {
         return value | MASK_NEGATIVE_IMMEDIATE;
     }
     return (short)value;
@@ -301,7 +300,7 @@ unsigned short ZEXT(unsigned short value) {
     return value;
 }
 
-// OLD FUNCTION BEFORE IMPLEMENTING NCURSES.
+// OLD FUNCTION WITHOUT NCURSES.
 /*void displayCPU(CPU_p *cpu, int memStart) {
     for(;;) {
         //printf("---displayCPU()\n"); // debugging
@@ -394,14 +393,12 @@ unsigned short ZEXT(unsigned short value) {
  * @param cpu the cpu object containing the data.
  */
 void displayCPU(CPU_p *cpu, int memStart) {
-
     int c;
     int hexExit;
-
+    isHalted = false; // TODO does this affect anything adversely?
     initscr();
     cbreak();
     clear();
-
     WINDOW *main_win = newwin(32, 49, 0, 0);
     box(main_win, 0, 0);
     refresh();
@@ -413,8 +410,8 @@ void displayCPU(CPU_p *cpu, int memStart) {
         int newStart = 0;
         char inStart[4];
         char *fileName = malloc(FILENAME_SIZE * sizeof(char)); //char fileName[FILENAME_SIZE];
-        mvwprintw(main_win, 1, 1, "Welcome to the LC-3 Simulator Simulator");
-        mvwprintw(main_win, 2, 1, "Registers");
+        mvwprintw(main_win, 1, 1,  "Welcome to the LC-3 Simulator Simulator");
+        mvwprintw(main_win, 2, 1,  "Registers");
         mvwprintw(main_win, 2, 31, "Memory");
 
         // First 8 lines
@@ -432,24 +429,25 @@ void displayCPU(CPU_p *cpu, int memStart) {
         }
 
         // Next 4 lines.
-        mvwprintw(main_win, 14, 1, "PC:  x%04X    IR: x%04X    x%04X: x%04X", cpu->pc+ADDRESS_MIN, cpu->ir, i+memStart, memory[i + (memStart - ADDRESS_MIN)]);
+        mvwprintw(main_win, 14, 1, "PC:  x%04X    IR: x%04X    x%04X: x%04X", cpu->pc+ADDRESS_MIN, cpu->ir, i+memStart, memory[i+(memStart-ADDRESS_MIN)]);
         i++;
-        mvwprintw(main_win, 15, 1, "A:   x%04X     B: x%04X    x%04X: x%04X", cpu->A, cpu->B, i+memStart, memory[i + (memStart - ADDRESS_MIN)]);
+        mvwprintw(main_win, 15, 1, "A:   x%04X     B: x%04X    x%04X: x%04X", cpu->A, cpu->B, i+memStart, memory[i+(memStart - ADDRESS_MIN)]);
         i++;
-        mvwprintw(main_win, 16, 1, "MAR: x%04X   MDR: x%04X    x%04X: x%04X", cpu->mar+ADDRESS_MIN, cpu->ir, i+memStart, memory[i + (memStart - ADDRESS_MIN)]);
+        mvwprintw(main_win, 16, 1, "MAR: x%04X   MDR: x%04X    x%04X: x%04X", cpu->mar+ADDRESS_MIN, cpu->ir, i+memStart, memory[i+(memStart-ADDRESS_MIN)]);
         i++;
         mvwprintw(main_win, 17, 1, "CC:  N:%d Z:%d P:%d           x%04X: x%04X",
-                cpu->cc >> BITSHIFT_CC_BIT3 & MASK_CC_N,
-                cpu->cc >> BITSHIFT_CC_BIT2 & MASK_CC_Z,
+                (cpu->cc >> BITSHIFT_CC_BIT3) & MASK_CC_N,
+                (cpu->cc >> BITSHIFT_CC_BIT2) & MASK_CC_Z,
                 cpu->cc  & MASK_CC_P,
                 i+ADDRESS_MIN,
-                memory[i + (memStart - ADDRESS_MIN)]);
+                memory[i+(memStart-ADDRESS_MIN)]);
 
         i++;
         // Last 2 lines.
         mvwprintw(main_win, 18, 28, "x%04X: x%04X", i+memStart, memory[i + (memStart - ADDRESS_MIN)]);
         mvwprintw(main_win, 19, 1, "Select: 1) Load 3) Step 5) Display Mem  9) Exit");
-        mvwprintw(main_win, 25, 1, " --------------------------------------------- ");
+        //mvwprintw(main_win, 20, 1, "        2)      4)      6)    7)   8)  10)");  // reserved line 20 for future options.
+        cursorAtPrompt(main_win, "");
 
         while(rePromptUser) {
             rePromptUser = false;
@@ -466,33 +464,34 @@ void displayCPU(CPU_p *cpu, int memStart) {
             c = wgetch(main_win);
             echo();
             box(main_win, 0, 0);
-            mvwprintw(main_win, 20, 1, "Input: %c", c);
+            //mvwprintw(main_win, 20, 1, "Input: %c", c); // 4.27a should not display here.
             refresh();
             switch(c){
                 case '1':
                     cpuTemp = initialize();
+                    isHalted = false;
                     cpu = &cpuTemp;
-                    mvwprintw(main_win, 21, 1, "Specify file name: ");
-                    refresh();
+                    cursorAtPrompt(main_win, "Specify file name: ");
                     wgetstr(main_win, fileName);
-                    loadProgramInstructions(openFileText(fileName));
+                    loadProgramInstructions(openFileText(fileName, main_win), main_win);
                     free(fileName);
                     box(main_win, 0, 0);
                     refresh();
                     break;
                 case '3':
                     //printf("CASE3\n"); // do nothing.  Just let the PC run the next instruction.
-                    controller(cpu); // invoke exclusively in case 3.
+                    controller(cpu, main_win); // invoke exclusively in case 3.
                     break;
                 case '5':
                     while (rePromptHex) {
-                        mvwprintw(main_win, 21, 1, "Push Q to return to main menu.");
-                        mvwprintw(main_win, 22, 1, "New Starting Address: x");
+                        //mvwprintw(main_win, 21, 1, "Push Q to return to main menu.");
+                        //mvwprintw(main_win, 22, 1, "New Starting Address: x");
+                        cursorAtPrompt(main_win, "New Starting Address: ");
                         wgetstr(main_win, inStart);
                         box(main_win, 0, 0);
                         refresh();
                         if (inStart[0] == 'q' || inStart[0] == 'Q') {
-                            mvwprintw(main_win, 23, 1, "Returning to main menu.");
+                            cursorAtPrompt(main_win, "Returning to main menu.");
                             rePromptUser = true;
                             break;
                         }
@@ -500,8 +499,7 @@ void displayCPU(CPU_p *cpu, int memStart) {
                             newStart = strtol(inStart, NULL, MAX_BIN_BITS);
                             displayCPU(cpu, newStart);
                         } else {
-                            mvwprintw(main_win, 24, 1, "You must enter a 4-digit hex value. Try again.");
-                            refresh();
+                            cursorAtPrompt(main_win, "You must enter a 4-digit hex value. Try again. ");
                             rePromptHex = true;
                         }
                     }
@@ -509,14 +507,12 @@ void displayCPU(CPU_p *cpu, int memStart) {
                     break;
                 case '9':
                     //printf("CASE9\n");
-                    //cpu->IR = 0xF025; // TRAP x25
                     endwin();
                     printf("Bubye\n");
                     exit(0);
                     break;
                 default:
-                    mvwprintw(main_win, 21, 1, "---Invalid selection.");
-                    refresh();
+                    cursorAtPrompt(main_win, "---Invalid selection ");
                     rePromptUser = true;
                     break;
             }
@@ -525,6 +521,32 @@ void displayCPU(CPU_p *cpu, int memStart) {
     }
 }
 
+void cursorAtPrompt(WINDOW *theWindow, char *theText) {
+    if (!isHalted) {
+         // First wipe out what ever is there.
+        mvwprintw(theWindow, 20, 1, "                                               ");
+    }
+    mvwprintw(theWindow, 21, 1, "-----------------------------------------------");
+    mvwprintw(theWindow, 22, 1, "Input                                          ");
+    mvwprintw(theWindow, 23, 1, "Output                                         ");
+    mvwprintw(theWindow, 20, 1, theText); //The last place the cursor will sit.
+    refresh();
+}
+
+void cursorAtInput(WINDOW *theWindow, char *theText) {
+    mvwprintw(theWindow, 22, 8, theText);
+    refresh();
+}
+
+void cursorAtOutput(WINDOW *theWindow, char *theText) {
+    mvwprintw(theWindow, 23, 8, theText);
+    refresh();
+}
+
+void cursorAtCustome(WINDOW *theWindow, uint theRow, uint theColumn, char *theText) {
+    mvwprintw(theWindow, theRow, theColumn, theText);
+    refresh();
+}
 
 /**
  * A function to check the validity of a hex number.
@@ -587,7 +609,7 @@ CPU_p initialize() {
  * @param theFileName the file name to open, in this present working directory.
  * @return the pointer to the file now opened.
  */
-FILE* openFileText(char *theFileName) {
+FILE* openFileText(char *theFileName, WINDOW *theWindow) {
     //printf("You said %s", theFileName); // debugging, remove me.
     FILE *dataFile;
     dataFile = fopen(theFileName, "r");
@@ -595,10 +617,15 @@ FILE* openFileText(char *theFileName) {
     if (dataFile == NULL) {
     //  printf("\n---ERROR: File %s could not be opened.\n\n", theFileName);
         char temp;
-        printf("Error, File not found.  Press <ENTER> to continue.", theFileName);
-        fflush(stdin);
-        temp = getchar(); // BUG this does not work as expected in option #1.
-        printf("\n");
+        if(theWindow == NULL) {
+            printf("Error, File not found.  Press <ENTER> to continue.", theFileName);
+            fflush(stdin);
+            temp = getchar(); // BUG this does not work as expected in option #1.
+            printf("\n");
+        } else {
+            cursorAtPrompt(theWindow, "Error, File not found.");
+            isHalted = true;
+        }
     } else {
         isHalted = false;
         //printf("\nSUCCESS: File Found: %s\n\n", theFileName); // debugging
@@ -611,7 +638,7 @@ FILE* openFileText(char *theFileName) {
  * Expects one instruction per line, in hex number form, and a new line character.
  * @param inputFile the file to read.
  */
-void loadProgramInstructions(FILE *inputFile) {
+void loadProgramInstructions(FILE *inputFile, WINDOW *theWindow) {
     if (inputFile != NULL){
         char instruction [5]; // includes room for the carriage return character.
         int length = sizeof(instruction);
@@ -638,8 +665,13 @@ void loadProgramInstructions(FILE *inputFile) {
                 i++;
                 }
         } else {
-            printf("Error, starting adddress must be between %x and %x\n"
+            if(theWindow == NULL) {
+                printf("Error, address must be between %x and %x\n"
                     , ADDRESS_MIN, (ADDRESS_MIN + MEMORY_SIZE));
+            } else {
+                cursorAtPrompt(theWindow, "Error, address "); // TODO specify min and max address.
+                isHalted = true;
+            }
         }
         fclose(inputFile);
     }
@@ -652,8 +684,7 @@ int main(int argc, char* argv[]) {
     char *fileName = argv[1]; //char *fileName = "./HW3.hex";
     CPU_p cpu = initialize();
     if(fileName != NULL) {
-        FILE *theFile = openFileText(fileName);
-        loadProgramInstructions(openFileText(fileName));
+        loadProgramInstructions(openFileText(fileName, NULL), NULL);
     }
     displayCPU(&cpu, ADDRESS_MIN); // send the address of the object.
 }
