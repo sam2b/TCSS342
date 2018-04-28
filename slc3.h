@@ -4,7 +4,7 @@
  *  Date Due: Apr 29, 2018
  *  Authors:  Sam Brendel, Mike Josten
  *  Problem 5
- *  version: 4.27a
+ *  version: 4.28a
  */
 #include <stdio.h>
 #include <stdbool.h>
@@ -31,16 +31,23 @@
 #define OP_NOT   9 // 1001 0000 0000 0000
 #define OP_TRAP 15 // 1111 0000 0000 0000
 #define OP_LD    2 // 0010 0000 0000 0000
+#define OP_LDR   6 // 0110 0000 0000 0000
 #define OP_ST    3 // 0011 0000 0000 0000
+#define OP_STR   7 // 0111 0000 0000 0000
 #define OP_JMP  12 // 1100 0000 0000 0000
 #define OP_BR    0 // 0000 0000 0000 0000
+#define OP_JSR   4 // 0100 0000 0000 0000
+#define OP_LEA  14 // 1110 0000 0000 0000
 
 #define MASK_OPCODE  61440 // 1111 0000 0000 0000
 #define MASK_DR       3584 // 0000 1110 0000 0000
 #define MASK_SR1       448 // 0000 0001 1100 0000
 #define MASK_SR2         7 // 0000 0000 0000 0111
+#define MASK_PCOFFSET11 2047 // 0000 0111 1111 1111
 #define MASK_PCOFFSET9 511 // 0000 0001 1111 1111
+#define MASK_PCOFFSET6  63 // 0000 0000 0011 1111
 #define MASK_TRAPVECT8 255 // 0000 0000 1111 1111
+#define MASK_BIT11    2048 // 0000 1000 0000 0000
 #define MASK_BIT5       32 // 0000 0000 0010 0000
 #define MASK_IMMED5     31 // 0000 0000 0001 1111
 #define MASK_NZP      3584 // 0000 1110 0000 0000
@@ -63,6 +70,7 @@
 #define BITSHIFT_CC                 9
 #define BITSHIFT_SR1                6
 #define BITSHIFT_BIT5               5
+#define BITSHIFT_BIT11		   11
 #define BITSHIFT_CC_BIT3            2
 #define BITSHIFT_CC_BIT2            1
 #define BITSHIFT_NEGATIVE_IMMEDIATE 4
@@ -97,7 +105,7 @@ short toSign(unsigned short);
 short SEXTimmed(unsigned short);
 void TRAP(unsigned short, CPU_p *, WINDOW *);
 unsigned short getCC(unsigned short);
-bool doBen(unsigned short, CPU_p *);
+bool setCC(unsigned short, CPU_p *);
 void displayHeader();
 FILE* openFileText(char *, WINDOW *);
 void loadProgramInstructions(FILE *, WINDOW *);
@@ -105,6 +113,6 @@ int hexCheck(char num[]);
 void cursorAtPrompt(WINDOW *, char *);
 void cursorAtInput(WINDOW *, char *);
 void cursorAtOutput(WINDOW *, char *);
-void cursorAtCustome(WINDOW *, uint, uint, char *);
+void cursorAtCustom(WINDOW *, int, int, char *);
 
 #endif /* SLC3_H_ */
