@@ -4,7 +4,7 @@
  *  Date Due: Apr 29, 2018
  *  Authors:  Sam Brendel, Mike Josten
  *  Problem 5
- *  version: 4.27a
+ *  version: 4.27b
  */
 
 #include "slc3.h"
@@ -448,6 +448,9 @@ void displayCPU(CPU_p *cpu, int memStart) {
         mvwprintw(main_win, 19, 1, "Select: 1) Load 3) Step 5) Display Mem  9) Exit");
         //mvwprintw(main_win, 20, 1, "        2)      4)      6)    7)   8)  10)");  // reserved line 20 for future options.
         cursorAtPrompt(main_win, "");
+        mvwprintw(main_win, 22, 1, "Input                                          ");
+        mvwprintw(main_win, 23, 1, "Output                                         ");
+        cursorAtPrompt(main_win, ""); // twice necessary to prevent overwrite.
 
         while(rePromptUser) {
             rePromptUser = false;
@@ -491,7 +494,7 @@ void displayCPU(CPU_p *cpu, int memStart) {
                         box(main_win, 0, 0);
                         refresh();
                         if (inStart[0] == 'q' || inStart[0] == 'Q') {
-                            cursorAtPrompt(main_win, "Returning to main menu.");
+                            cursorAtPrompt(main_win, "");
                             rePromptUser = true;
                             break;
                         }
@@ -527,8 +530,8 @@ void cursorAtPrompt(WINDOW *theWindow, char *theText) {
         mvwprintw(theWindow, 20, 1, "                                               ");
     }
     mvwprintw(theWindow, 21, 1, "-----------------------------------------------");
-    mvwprintw(theWindow, 22, 1, "Input                                          ");
-    mvwprintw(theWindow, 23, 1, "Output                                         ");
+    //mvwprintw(theWindow, 22, 1, "Input                                          ");
+    //mvwprintw(theWindow, 23, 1, "Output                                         ");
     mvwprintw(theWindow, 20, 1, theText); //The last place the cursor will sit.
     refresh();
 }
@@ -543,7 +546,7 @@ void cursorAtOutput(WINDOW *theWindow, char *theText) {
     refresh();
 }
 
-void cursorAtCustome(WINDOW *theWindow, uint theRow, uint theColumn, char *theText) {
+void cursorAtCustom(WINDOW *theWindow, uint theRow, uint theColumn, char *theText) {
     mvwprintw(theWindow, theRow, theColumn, theText);
     refresh();
 }

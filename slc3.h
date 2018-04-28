@@ -4,7 +4,7 @@
  *  Date Due: Apr 29, 2018
  *  Authors:  Sam Brendel, Mike Josten
  *  Problem 5
- *  version: 4.27a
+ *  version: 4.27b
  */
 #include <stdio.h>
 #include <stdbool.h>
@@ -105,6 +105,6 @@ int hexCheck(char num[]);
 void cursorAtPrompt(WINDOW *, char *);
 void cursorAtInput(WINDOW *, char *);
 void cursorAtOutput(WINDOW *, char *);
-void cursorAtCustome(WINDOW *, uint, uint, char *);
+void cursorAtCustom(WINDOW *, uint, uint, char *);
 
 #endif /* SLC3_H_ */
