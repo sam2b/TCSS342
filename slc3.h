@@ -4,7 +4,7 @@
  *  Date Due: Apr 29, 2018
  *  Authors:  Sam Brendel, Mike Josten
  *  Problem 5
- *  version: 4.27b
+ *  version: 4.27c
  */
 #include <stdio.h>
 #include <stdbool.h>
@@ -97,7 +97,7 @@ short toSign(unsigned short);
 short SEXTimmed(unsigned short);
 void TRAP(unsigned short, CPU_p *, WINDOW *);
 unsigned short getCC(unsigned short);
-bool doBen(unsigned short, CPU_p *);
+bool setCC(unsigned short, CPU_p *);
 void displayHeader();
 FILE* openFileText(char *, WINDOW *);
 void loadProgramInstructions(FILE *, WINDOW *);

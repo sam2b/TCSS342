@@ -4,7 +4,7 @@
  *  Date Due: Apr 29, 2018
  *  Authors:  Sam Brendel, Mike Josten
  *  Problem 5
- *  version: 4.27b
+ *  version: 4.27c
  */
 
 #include "slc3.h"
@@ -17,6 +17,7 @@
 
 unsigned short memory[MEMORY_SIZE];
 bool isHalted = false;
+bool isRun = false;
 
 /**
  * Simulates trap table lookup.
@@ -39,6 +40,7 @@ void trap(unsigned short vector, CPU_p *cpu, WINDOW *theWindow) {
         cursorAtPrompt(theWindow, "==========HALT==========");
         cpu->pc = 0; // reset to zero as per Prof Mobus.
         isHalted = true;
+        isRun = false;
         break;
     default: 
         cursorAtPrompt(theWindow, "Error: Unknown Trap vector");
@@ -192,7 +194,7 @@ int controller(CPU_p *cpu, WINDOW *theWindow) {
                     cpu->pc = cpu->reg[sr1];
                     break;
                 case OP_BR:
-                    if (doBen(nzp, cpu)) {
+                    if (setCC(nzp, cpu)) {
                         cpu->pc += (offset);
                     }
                     break;
@@ -240,11 +242,11 @@ int controller(CPU_p *cpu, WINDOW *theWindow) {
 } // end controller()
 
 /**
- * Gets the condition code of the resulting computer value.
+ * Sets the condition code resulting by the resulting computer value.
  * @param value the value that was recently computed.
  * @return the condition code that represents the 3bit NZP as binary.
  */
-bool doBen(unsigned short nzp, CPU_p *cpu) {
+bool setCC(unsigned short nzp, CPU_p *cpu) {
     return (
                (cpu->cc == CONDITION_N   &&  nzp == CONDITION_N)
             || (cpu->cc == CONDITION_Z   &&  nzp == CONDITION_Z)
@@ -446,10 +448,10 @@ void displayCPU(CPU_p *cpu, int memStart) {
         // Last 2 lines.
         mvwprintw(main_win, 18, 28, "x%04X: x%04X", i+memStart, memory[i + (memStart - ADDRESS_MIN)]);
         mvwprintw(main_win, 19, 1, "Select: 1) Load 3) Step 5) Display Mem  9) Exit");
-        //mvwprintw(main_win, 20, 1, "        2)      4)      6)    7)   8)  10)");  // reserved line 20 for future options.
+        mvwprintw(main_win, 20, 1, "        2) Run                                 ");
         cursorAtPrompt(main_win, "");
-        mvwprintw(main_win, 22, 1, "Input                                          ");
-        mvwprintw(main_win, 23, 1, "Output                                         ");
+        mvwprintw(main_win, 23, 1, "Input                                          ");
+        mvwprintw(main_win, 24, 1, "Output                                         ");
         cursorAtPrompt(main_win, ""); // twice necessary to prevent overwrite.
 
         while(rePromptUser) {
@@ -464,10 +466,13 @@ void displayCPU(CPU_p *cpu, int memStart) {
             move(24, 1);
             clrtoeol();
             noecho();
-            c = wgetch(main_win);
+            if (isRun) {
+                c = '3'; // keep stepping until TRAP x25 is hit.
+            } else {
+                c = wgetch(main_win); // This is what stops to prompt the user for an Option input.
+            }
             echo();
             box(main_win, 0, 0);
-            //mvwprintw(main_win, 20, 1, "Input: %c", c); // 4.27a should not display here.
             refresh();
             switch(c){
                 case '1':
@@ -480,6 +485,10 @@ void displayCPU(CPU_p *cpu, int memStart) {
                     free(fileName);
                     box(main_win, 0, 0);
                     refresh();
+                    break;
+                case '2':
+                    cursorAtPrompt(main_win, "Option to run the program until HALT."); // TODO change the text to say something else.
+                    isRun = true;
                     break;
                 case '3':
                     //printf("CASE3\n"); // do nothing.  Just let the PC run the next instruction.
@@ -527,22 +536,20 @@ void displayCPU(CPU_p *cpu, int memStart) {
 void cursorAtPrompt(WINDOW *theWindow, char *theText) {
     if (!isHalted) {
          // First wipe out what ever is there.
-        mvwprintw(theWindow, 20, 1, "                                               ");
+        mvwprintw(theWindow, 21, 1, "                                               ");
     }
-    mvwprintw(theWindow, 21, 1, "-----------------------------------------------");
-    //mvwprintw(theWindow, 22, 1, "Input                                          ");
-    //mvwprintw(theWindow, 23, 1, "Output                                         ");
-    mvwprintw(theWindow, 20, 1, theText); //The last place the cursor will sit.
+    mvwprintw(theWindow, 22, 1, "-----------------------------------------------");
+    mvwprintw(theWindow, 21, 1, theText); //The last place the cursor will sit.
     refresh();
 }
 
 void cursorAtInput(WINDOW *theWindow, char *theText) {
-    mvwprintw(theWindow, 22, 8, theText);
+    mvwprintw(theWindow, 23, 8, theText);
     refresh();
 }
 
 void cursorAtOutput(WINDOW *theWindow, char *theText) {
-    mvwprintw(theWindow, 23, 8, theText);
+    mvwprintw(theWindow, 24, 8, theText);
     refresh();
 }
 
