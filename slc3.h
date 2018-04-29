@@ -1,10 +1,10 @@
 /*
  *  slc3.h
  *
- *  Date Due: Apr 29, 2018
+ *  Date Due: May 2, 2018
  *  Authors:  Sam Brendel, Mike Josten
  *  Problem 5
- *  version: 4.28a
+ *  version: 4.28b
  */
 #include <stdio.h>
 #include <stdbool.h>
@@ -15,6 +15,7 @@
 
 #define MEMORY_SIZE       10000
 #define FILENAME_SIZE       200
+#define STRING_SIZE         200
 #define ADDRESS_MIN      0x3000
 #define MAX_HEX_BITS          4
 #define MAX_BIN_BITS         16
