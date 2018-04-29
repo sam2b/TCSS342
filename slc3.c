@@ -4,7 +4,7 @@
  *  Date Due: May 2, 2018
  *  Authors:  Sam Brendel, Mike Josten
  *  Problem 5
- *  version: 4.28b
+ *  version: 4.28c
  */
 
 #include "slc3.h"
@@ -27,16 +27,26 @@ bool isRun = false;
  */
 void trap(unsigned short vector, CPU_p *cpu, WINDOW *theWindow) {
     switch (vector) {
-        case TRAP_VECTOR_X20: // GETC
-            printf("\nDOING TRAP X20\n");
+        case TRAP_VECTOR_X20: ;// GETC
+	    noecho(); //turn echo off
+	    char *input = (char*) malloc(sizeof(char));
+	    cursorAtInput(theWindow, input);
+	    cpu->reg[0] = *input;
+            //printf("\nDOING TRAP X20\n");
+	    free(input);
+	    echo(); //turn echo back on.
             break;
-        case TRAP_VECTOR_X21: // OUT
-            printf("\nDOING TRAP X21\n");
+        case TRAP_VECTOR_X21: ;// OUT
+	    /* put R0 value into char variable, then send to "cursor" function */
+	    char *output = (char*) malloc(sizeof(char) * 2);
+	    output[0] = cpu->reg[0];
+	    output[1] = '\0'; // null-terminator
+	    cursorAtOutput(theWindow, output);
+            //printf("\nDOING TRAP X21\n");
+	    free(output);
             break;
         case TRAP_VECTOR_X22: ;//PUTS trap command
             //printf("\nDOING TRAP X22\n");
-            // TODO FIX BUG THAT DOESN'T DISPLAY OUTPUT.
-            // the output string will only display when isHalted is true.
             char outputString[STRING_SIZE];
             short memCounter = cpu->reg[0];
             short outCounter = 0;
@@ -594,7 +604,8 @@ void cursorAtPrompt(WINDOW *theWindow, char *theText) {
 }
 
 void cursorAtInput(WINDOW *theWindow, char *theText) {
-    mvwprintw(theWindow, 23, 8, theText);
+    int input = mvwgetch(theWindow, 23, 8);
+    theText[0] = input;
     refresh();
 }
 
