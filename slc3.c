@@ -4,7 +4,7 @@
  *  Date Due: Apr 29, 2018
  *  Authors:  Sam Brendel, Mike Josten
  *  Problem 5
- *  version: 4.27c
+ *  version: 4.28a
  */
 
 #include "slc3.h"
@@ -26,6 +26,8 @@ bool isRun = false;
  * @param cpu the cpu object that contains data.
  */
 void trap(unsigned short vector, CPU_p *cpu, WINDOW *theWindow) {
+    
+
     switch (vector) {
     case TRAP_VECTOR_X20:
         printf(" ");
@@ -33,9 +35,32 @@ void trap(unsigned short vector, CPU_p *cpu, WINDOW *theWindow) {
     case TRAP_VECTOR_X21:
         printf(" ");
         break;
-    case TRAP_VECTOR_X22:
-        printf(" ");
+
+    case TRAP_VECTOR_X22: ;//PUTS trap command
+	// TODO FIX BUG THAT DOESN'T DISPLAY OUTPUT.
+	// the output string will only display when isHalted is true.
+	char outputString[100];
+	short memCounter = cpu->reg[0];
+	short outCounter = 0;
+	
+	/* store characters in string until character is null pointer,
+	* starting with character stored in memory at reg[0] and incrementing until 
+	* null pointer is reached. */
+	while (memory[memCounter] != 0) {
+	    outputString[outCounter] = memory[memCounter];
+	    memCounter++;
+	    outCounter++;
+
+	}
+	outputString[outCounter] = '\0';
+        cursorAtOutput(theWindow, outputString);
+	
+	//isHalted = true;
+	//isRun = false;
+	
+	
         break;
+
     case TRAP_VECTOR_X25:
         cursorAtPrompt(theWindow, "==========HALT==========");
         cpu->pc = 0; // reset to zero as per Prof Mobus.
@@ -56,7 +81,7 @@ int controller(CPU_p *cpu, WINDOW *theWindow) {
 
     // check to make sure both pointers are not NULL
     // do any initializations here
-    unsigned int opcode, dr, sr1, sr2, bit5, offset, state, nzp;    // fields for the IR
+    unsigned int opcode, dr, sr1, sr2, bit5, bit11, offset, state, nzp;    // fields for the IR
     unsigned short immed; // before using this value, blahblah = SEXTimmed(immed);
     unsigned short vector8, vector16;
     bool isCycleComplete = false;
@@ -101,11 +126,37 @@ int controller(CPU_p *cpu, WINDOW *theWindow) {
                     cpu->mar = cpu->pc + offset; // microstate 2.
                     cpu->mdr = memory[cpu->mar]; // microstate 25.
                     break;
+
+		case OP_LDR:
+		    dr = (cpu->ir & MASK_DR) >> BITSHIFT_DR;
+		    sr1 = (cpu->ir & MASK_SR1) >> BITSHIFT_SR1;
+		    offset = cpu->ir & MASK_PCOFFSET6;
+		    cpu->mar = cpu->reg[sr1] + offset;
+		    cpu->mdr = memory[cpu->mar];
+		    break;
+
                 case OP_ST:
                     dr       = (cpu->ir & MASK_DR) >> BITSHIFT_DR;         // This is actually a source register, but still use dr.
                     offset   =  cpu->ir & MASK_PCOFFSET9;
                     cpu->mar =  cpu->pc + offset; // microstate 2.
                     break;
+
+		case OP_STR:
+		    dr = (cpu->ir & MASK_DR) >> BITSHIFT_DR;  //actiually source register
+		    sr1 = (cpu->ir & MASK_SR1) >> BITSHIFT_SR1;  //base register
+		    offset = cpu->ir & MASK_PCOFFSET6;
+		    cpu->mar = cpu->reg[sr1] + offset;
+		    break;
+
+		case OP_LEA:
+		    dr       = (cpu->ir & MASK_DR) >> BITSHIFT_DR;
+		    offset   =  cpu->ir & MASK_PCOFFSET9;
+		    break;
+
+		case OP_JSR:
+		    offset = cpu->ir & MASK_PCOFFSET11;
+
+		    break;
             }
             state = FETCH_OP;
             break;
@@ -141,10 +192,13 @@ int controller(CPU_p *cpu, WINDOW *theWindow) {
                     cpu->mar = cpu->pc + offset;
                     cpu->mdr = memory[cpu->mar];
                     break;
+
                 case OP_ST: // Same as LD.
+		case OP_STR:
                     // Book page 124.
                     cpu->mdr = cpu->reg[dr];
                     break;
+
                 case OP_JMP:
                     sr1 = (cpu->ir & MASK_SR1) >> BITSHIFT_SR1;
                     break;
@@ -152,6 +206,20 @@ int controller(CPU_p *cpu, WINDOW *theWindow) {
                     nzp = (cpu->ir & MASK_NZP) >> BITSHIFT_CC;
                     offset = cpu->ir & MASK_PCOFFSET9;
                     break;
+
+		case OP_JSR:
+		    bit11 = (cpu->ir & MASK_BIT11) >> BITSHIFT_BIT11;
+		    cpu->reg[7] = cpu->pc;
+
+		    if (bit11 == 0) { //JSRR
+			sr1 = (cpu->ir & MASK_SR1) >> BITSHIFT_SR1;
+			cpu->pc = cpu->reg[sr1];
+		    } 
+		    else { //JSR
+			cpu->pc += offset;
+		    }
+		    break;
+
                 default:
                     break;
             }
@@ -183,11 +251,12 @@ int controller(CPU_p *cpu, WINDOW *theWindow) {
                     break;
                 case OP_TRAP:
                     // Book page 222.
-                    vector16   = ZEXT(vector8); // TODO: should we make this actually do a zero extend to 16 bits?
-                    cpu->mar    = vector16;
+                    //vector16   = ZEXT(vector8); // TODO: should we make this actually do a zero extend to 16 bits?
+                    //cpu->mar    = vector16;
                     cpu->reg[7] = cpu->pc; // Store the PC in R7 before loading PC with the starting address of the service routine.
-                    cpu->mdr    = memory[cpu->mar]; // read the contents of the register.
-                    cpu->pc     = cpu->mdr; // The contents of the MDR are loaded into the PC.  Load the PC with the starting address of the service routine.
+                    //cpu->mdr    = memory[cpu->mar]; // read the contents of the register.
+                    //cpu->pc     = cpu->mdr; // The contents of the MDR are loaded into the PC.  Load the PC with the starting address of the service routine.
+		    
                     trap(vector8, cpu, theWindow);
                     break;
                 case OP_JMP:
@@ -213,15 +282,24 @@ int controller(CPU_p *cpu, WINDOW *theWindow) {
                 //cpu->reg[dr] = cpu->mdr;
                 cpu->reg[dr] = toSign(cpu->mdr);
                 break;
+
             case OP_LD:
+	    case OP_LDR:
                 cpu->reg[dr] = cpu->mdr; // Load into the register.
                 break;
+
             case OP_ST:
+	    case OP_STR:
                 memory[cpu->mar] = cpu->mdr;     // Store into memory.
                 break;
+
             case OP_BR:
                 // cpu->pc = cpu->mar; // TODO does this really happen in store phase?
                 break;
+	    case OP_LEA:
+		cpu->reg[dr] = cpu->pc  + offset;
+		cpu->cc = getCC(cpu->reg[dr]);
+		break;
             }
 
             // do any clean up here in prep for the next complete cycle
@@ -553,7 +631,7 @@ void cursorAtOutput(WINDOW *theWindow, char *theText) {
     refresh();
 }
 
-void cursorAtCustom(WINDOW *theWindow, uint theRow, uint theColumn, char *theText) {
+void cursorAtCustom(WINDOW *theWindow, int theRow, int theColumn, char *theText) {
     mvwprintw(theWindow, theRow, theColumn, theText);
     refresh();
 }
@@ -628,7 +706,7 @@ FILE* openFileText(char *theFileName, WINDOW *theWindow) {
     //  printf("\n---ERROR: File %s could not be opened.\n\n", theFileName);
         char temp;
         if(theWindow == NULL) {
-            printf("Error, File not found.  Press <ENTER> to continue.", theFileName);
+            printf("Error, File not found.  Press <ENTER> to continue.");
             fflush(stdin);
             temp = getchar(); // BUG this does not work as expected in option #1.
             printf("\n");
