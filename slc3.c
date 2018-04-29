@@ -4,7 +4,7 @@
  *  Date Due: May 2, 2018
  *  Authors:  Sam Brendel, Mike Josten
  *  Problem 5
- *  version: 4.28c
+ *  version: 4.29a
  */
 
 #include "slc3.h"
@@ -18,6 +18,7 @@
 unsigned short memory[MEMORY_SIZE];
 bool isHalted = false;
 bool isRun = false;
+int outputLineCounter = 0;
 
 /**
  * Simulates trap table lookup.
@@ -28,22 +29,22 @@ bool isRun = false;
 void trap(unsigned short vector, CPU_p *cpu, WINDOW *theWindow) {
     switch (vector) {
         case TRAP_VECTOR_X20: ;// GETC
-	    noecho(); //turn echo off
-	    char *input = (char*) malloc(sizeof(char));
-	    cursorAtInput(theWindow, input);
-	    cpu->reg[0] = *input;
-            //printf("\nDOING TRAP X20\n");
-	    free(input);
-	    echo(); //turn echo back on.
-            break;
-        case TRAP_VECTOR_X21: ;// OUT
-	    /* put R0 value into char variable, then send to "cursor" function */
-	    char *output = (char*) malloc(sizeof(char) * 2);
-	    output[0] = cpu->reg[0];
-	    output[1] = '\0'; // null-terminator
-	    cursorAtOutput(theWindow, output);
+            noecho(); //turn echo off
+            char *input = (char*) malloc(sizeof(char));
+            cursorAtInput(theWindow, input);
+            cpu->reg[0] = *input;
+                //printf("\nDOING TRAP X20\n");
+            free(input);
+            echo(); //turn echo back on.
+                break;
+            case TRAP_VECTOR_X21: ;// OUT
+            /* put R0 value into char variable, then send to "cursor" function */
+            char *output = (char*) malloc(sizeof(char) * 2);
+            output[0] = cpu->reg[0];
+            output[1] = '\0'; // null-terminator
+            cursorAtOutput(theWindow, output);
             //printf("\nDOING TRAP X21\n");
-	    free(output);
+            free(output);
             break;
         case TRAP_VECTOR_X22: ;//PUTS trap command
             //printf("\nDOING TRAP X22\n");
@@ -446,7 +447,6 @@ unsigned short ZEXT(unsigned short value) {
     }
 }*/
 
-
 /**
  * Print out fields to the console for the CPU_p object.
  * @param cpu the cpu object containing the data.
@@ -537,6 +537,7 @@ void displayCPU(CPU_p *cpu, int memStart) {
             switch(c){
                 case '1':
                     cpuTemp = initialize();
+                    clearOutput(main_win);
                     isHalted = false;
                     cpu = &cpuTemp;
                     cursorAtPrompt(main_win, "Specify file name: ");
@@ -610,8 +611,19 @@ void cursorAtInput(WINDOW *theWindow, char *theText) {
 }
 
 void cursorAtOutput(WINDOW *theWindow, char *theText) {
-    mvwprintw(theWindow, 24, 8, theText);
+    mvwprintw(theWindow, OUTPUT_LINE_NUMBER + outputLineCounter, 8, theText);
+    outputLineCounter++;
     refresh();
+}
+
+void clearOutput(WINDOW *theWindow) {
+    int i;
+    mvwprintw(theWindow, OUTPUT_LINE_NUMBER, 1, "Output                                         ");
+    for (i = 1; i <= OUTPUT_AREA_DEPTH; i++) {
+        mvwprintw(theWindow, OUTPUT_LINE_NUMBER + i, 2, "                                              ");
+    }
+    refresh();
+    outputLineCounter = 0;
 }
 
 void cursorAtCustom(WINDOW *theWindow, int theRow, int theColumn, char *theText) {

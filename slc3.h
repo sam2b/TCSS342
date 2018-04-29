@@ -4,7 +4,7 @@
  *  Date Due: May 2, 2018
  *  Authors:  Sam Brendel, Mike Josten
  *  Problem 5
- *  version: 4.28c
+ *  version: 4.29a
  */
 #include <stdio.h>
 #include <stdbool.h>
@@ -16,6 +16,8 @@
 #define MEMORY_SIZE       10000
 #define FILENAME_SIZE       200
 #define STRING_SIZE         200
+#define OUTPUT_LINE_NUMBER   24
+#define OUTPUT_AREA_DEPTH     6
 #define ADDRESS_MIN      0x3000
 #define MAX_HEX_BITS          4
 #define MAX_BIN_BITS         16
@@ -115,5 +117,6 @@ void cursorAtPrompt(WINDOW *, char *);
 void cursorAtInput(WINDOW *, char *);
 void cursorAtOutput(WINDOW *, char *);
 void cursorAtCustom(WINDOW *, int, int, char *);
+void clearOutput(WINDOW *);
 
 #endif /* SLC3_H_ */
