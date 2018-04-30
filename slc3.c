@@ -1,10 +1,10 @@
 /*
  *  slc3.c
  *
- *  Date Due: Apr 29, 2018
+ *  Date Due: May 2, 2018
  *  Authors:  Sam Brendel, Mike Josten
  *  Problem 5
- *  version: 4.28a
+ *  version: 4.30b
  */
 
 #include "slc3.h"
@@ -18,6 +18,7 @@
 unsigned short memory[MEMORY_SIZE];
 bool isHalted = false;
 bool isRun = false;
+int outputLineCounter = 0;
 
 /**
  * Simulates trap table lookup.
@@ -26,50 +27,51 @@ bool isRun = false;
  * @param cpu the cpu object that contains data.
  */
 void trap(unsigned short vector, CPU_p *cpu, WINDOW *theWindow) {
-    
-
     switch (vector) {
-    case TRAP_VECTOR_X20:
-        printf(" ");
-        break;
-    case TRAP_VECTOR_X21:
-        printf(" ");
-        break;
-
-    case TRAP_VECTOR_X22: ;//PUTS trap command
-	// TODO FIX BUG THAT DOESN'T DISPLAY OUTPUT.
-	// the output string will only display when isHalted is true.
-	char outputString[100];
-	short memCounter = cpu->reg[0];
-	short outCounter = 0;
-	
-	/* store characters in string until character is null pointer,
-	* starting with character stored in memory at reg[0] and incrementing until 
-	* null pointer is reached. */
-	while (memory[memCounter] != 0) {
-	    outputString[outCounter] = memory[memCounter];
-	    memCounter++;
-	    outCounter++;
-
-	}
-	outputString[outCounter] = '\0';
-        cursorAtOutput(theWindow, outputString);
-	
-	//isHalted = true;
-	//isRun = false;
-	
-	
-        break;
-
-    case TRAP_VECTOR_X25:
-        cursorAtPrompt(theWindow, "==========HALT==========");
-        cpu->pc = 0; // reset to zero as per Prof Mobus.
-        isHalted = true;
-        isRun = false;
-        break;
-    default: 
-        cursorAtPrompt(theWindow, "Error: Unknown Trap vector");
-        break;
+        case TRAP_VECTOR_X20: ;// GETC
+            noecho(); //turn echo off
+            char *input = (char*) malloc(sizeof(char));
+            cursorAtInput(theWindow, input);
+            cpu->reg[0] = *input;
+                //printf("\nDOING TRAP X20\n");
+            free(input);
+            echo(); //turn echo back on.
+                break;
+            case TRAP_VECTOR_X21: ;// OUT
+            /* put R0 value into char variable, then send to "cursor" function */
+            char *output = (char*) malloc(sizeof(char) * 2);
+            output[0] = cpu->reg[0];
+            output[1] = '\0'; // null-terminator
+            cursorAtOutput(theWindow, output);
+            //printf("\nDOING TRAP X21\n");
+            free(output);
+            break;
+        case TRAP_VECTOR_X22: ;//PUTS trap command
+            //printf("\nDOING TRAP X22\n");
+            char *outputString = (char*) malloc(sizeof(char) * 20);
+            short memCounter = cpu->reg[0];
+            short outCounter = 0;
+            /* store characters in string until character is null pointer,
+            * starting with character stored in memory at reg[0] and incrementing until 
+            * null pointer is reached. */
+            while (memory[memCounter] != 0) {
+                outputString[outCounter] = memory[memCounter];
+                memCounter++;
+                outCounter++;
+            }
+            outputString[outCounter] = '\0';
+            cursorAtOutput(theWindow, outputString);
+	    free(outputString);
+            break;
+        case TRAP_VECTOR_X25: // HALT
+            cursorAtPrompt(theWindow, "==========HALT==========");
+            cpu->pc = 0; // reset to zero as per Prof Mobus.
+            isHalted = true;
+            isRun = false;
+            break;
+        default: 
+            cursorAtPrompt(theWindow, "Error: Unknown Trap vector");
+            break;
     }
 }
 
@@ -81,7 +83,8 @@ int controller(CPU_p *cpu, WINDOW *theWindow) {
 
     // check to make sure both pointers are not NULL
     // do any initializations here
-    unsigned int opcode, dr, sr1, sr2, bit5, bit11, offset, state, nzp;    // fields for the IR
+    unsigned int opcode, dr, sr1, sr2, bit5, bit11, state, nzp;    // fields for the IR
+    short offset;
     unsigned short immed; // before using this value, blahblah = SEXTimmed(immed);
     unsigned short vector8, vector16;
     bool isCycleComplete = false;
@@ -92,7 +95,7 @@ int controller(CPU_p *cpu, WINDOW *theWindow) {
             case FETCH: // microstates 18, 33, 35 in the book.
                 //printf("Now in FETCH---------------\n");
                 cpu->mar = cpu->pc;           // Step 1: MAR is loaded with the contends of the PC,
-                cpu->pc++;                   //         and also increment PC. Only done in the FETCH phase.
+                cpu->pc++;                    //         and also increment PC. Only done in the FETCH phase.
                 cpu->mdr = memory[cpu->mar];  // Step 2: Interrogate memory, resulting in the instruction placed into the MDR.
                 cpu->ir  = cpu->mdr;          // Step 3: Load the IR with the contents of the MDR.
                 state    = DECODE;
@@ -103,209 +106,192 @@ int controller(CPU_p *cpu, WINDOW *theWindow) {
                 opcode = (cpu->ir & MASK_OPCODE) >> BITSHIFT_OPCODE; // Input is the four-bit opcode IR[15:12]. The output line asserted is the one corresponding to the opcode at the input.
                 //opcode = opcode  >> BITSHIFT_OPCODE;
                 switch (opcode) {
-                // different opcodes require different handling
-                // compute effective address, e.g. add sext(immed7) to register.
-                case OP_LD:
-                    dr     = (cpu->ir >> BITSHIFT_DR) & MASK_SR2;
-                    offset = cpu->ir & MASK_PCOFFSET9;
-                    break;
-            }
-            state = EVAL_ADDR;
-            break;
-
-        case EVAL_ADDR:
-            //printf("Now in EVAL_ADDR---------------\n");
-            // This phase computes the address of the memory location that is needed to process the instruction.
-            // NOTE: Study each opcode to determine what all happens this phase for that opcode.
-            // Look at the LD instruction to see microstate 2 example.
-            switch (opcode) {
-                // different opcodes require different handling
-                // compute effective address, e.g. add sext(immed7) to
-                // register
-                case OP_LD:
-                    cpu->mar = cpu->pc + offset; // microstate 2.
-                    cpu->mdr = memory[cpu->mar]; // microstate 25.
-                    break;
-
-		case OP_LDR:
-		    dr = (cpu->ir & MASK_DR) >> BITSHIFT_DR;
-		    sr1 = (cpu->ir & MASK_SR1) >> BITSHIFT_SR1;
-		    offset = cpu->ir & MASK_PCOFFSET6;
-		    cpu->mar = cpu->reg[sr1] + offset;
-		    cpu->mdr = memory[cpu->mar];
-		    break;
-
-                case OP_ST:
-                    dr       = (cpu->ir & MASK_DR) >> BITSHIFT_DR;         // This is actually a source register, but still use dr.
-                    offset   =  cpu->ir & MASK_PCOFFSET9;
-                    cpu->mar =  cpu->pc + offset; // microstate 2.
-                    break;
-
-		case OP_STR:
-		    dr = (cpu->ir & MASK_DR) >> BITSHIFT_DR;  //actiually source register
-		    sr1 = (cpu->ir & MASK_SR1) >> BITSHIFT_SR1;  //base register
-		    offset = cpu->ir & MASK_PCOFFSET6;
-		    cpu->mar = cpu->reg[sr1] + offset;
-		    break;
-
-		case OP_LEA:
-		    dr       = (cpu->ir & MASK_DR) >> BITSHIFT_DR;
-		    offset   =  cpu->ir & MASK_PCOFFSET9;
-		    break;
-
-		case OP_JSR:
-		    offset = cpu->ir & MASK_PCOFFSET11;
-
-		    break;
-            }
-            state = FETCH_OP;
-            break;
-
-        case FETCH_OP:
-            //printf("Now in FETCH_OP---------------\n");
-            switch (opcode) {
-                // get operands out of registers into A, B of ALU
-                // or get memory for load instr.
-                case OP_ADD:
-                case OP_AND:
-                    dr   = (cpu->ir & MASK_DR) >> BITSHIFT_DR;
-                    sr1  = (cpu->ir & MASK_SR1) >> BITSHIFT_SR1;
-                    bit5 = (cpu->ir & MASK_BIT5) >> BITSHIFT_BIT5;
-                    if (bit5 == 0) {
-                        sr2 = cpu->ir & MASK_SR2; // no shift needed.
-                    } else if (bit5 == 1) {
-                        immed = cpu->ir & MASK_IMMED5; // no shift needed.
-                    }
-                    // The book page 106 says current microprocessors can be done simultaneously during fetch, but this simulator is old skool.
-                    break;
-                case OP_NOT:
-                    dr  = (cpu->ir & MASK_DR) >> BITSHIFT_DR;
-                    sr1 = (cpu->ir & MASK_SR1) >> BITSHIFT_SR1;
-                    break;
-                case OP_TRAP:
-                    vector8 = cpu->ir & MASK_TRAPVECT8; // No shift needed.
-                    break;
-                case OP_LD:
-                    dr      = (cpu->ir & MASK_DR) >> BITSHIFT_DR;
-                    offset  = cpu->ir & MASK_PCOFFSET9;
-                    offset  = toSign(offset);
-                    cpu->mar = cpu->pc + offset;
-                    cpu->mdr = memory[cpu->mar];
-                    break;
-
-                case OP_ST: // Same as LD.
-		case OP_STR:
-                    // Book page 124.
-                    cpu->mdr = cpu->reg[dr];
-                    break;
-
-                case OP_JMP:
-                    sr1 = (cpu->ir & MASK_SR1) >> BITSHIFT_SR1;
-                    break;
-                case OP_BR:
-                    nzp = (cpu->ir & MASK_NZP) >> BITSHIFT_CC;
-                    offset = cpu->ir & MASK_PCOFFSET9;
-                    break;
-
-		case OP_JSR:
-		    bit11 = (cpu->ir & MASK_BIT11) >> BITSHIFT_BIT11;
-		    cpu->reg[7] = cpu->pc;
-
-		    if (bit11 == 0) { //JSRR
-			sr1 = (cpu->ir & MASK_SR1) >> BITSHIFT_SR1;
-			cpu->pc = cpu->reg[sr1];
-		    } 
-		    else { //JSR
-			cpu->pc += offset;
-		    }
-		    break;
-
-                default:
-                    break;
-            }
-            state = EXECUTE;
-            break;
-
-        case EXECUTE: // Note that ST does not have an execute microstate.
-            //printf("Now in EXECUTE---------------\n");
-            switch (opcode) {
-                case OP_ADD:
-                    if (bit5 == 0) {
-                        cpu->mdr = cpu->reg[sr2] + cpu->reg[sr1];
-                    } else if (bit5 == 1) {
-                        cpu->mdr = cpu->reg[sr1] + SEXTimmed(immed);
-                    }
-                    cpu->cc = getCC(cpu->mdr); // TODO should this be set in this phase?
-                    break;
-                case OP_AND:
-                    if (bit5 == 0) {
-                        cpu->mdr = cpu->reg[sr2] & cpu->reg[sr1];
-                    } else if (bit5 == 1) {
-                        cpu->mdr = cpu->reg[sr1] & SEXTimmed(immed);
-                    }
-                    cpu->cc = getCC(cpu->mdr); // TODO should this be set in this phase?
-                    break;
-                case OP_NOT:
-                    cpu->mdr = ~cpu->reg[sr1]; // Interpret as a negative if the leading bit is a 1.
-                    cpu->cc = getCC(cpu->mdr); // TODO should this be set in this phase?
-                    break;
-                case OP_TRAP:
-                    // Book page 222.
-                    //vector16   = ZEXT(vector8); // TODO: should we make this actually do a zero extend to 16 bits?
-                    //cpu->mar    = vector16;
-                    cpu->reg[7] = cpu->pc; // Store the PC in R7 before loading PC with the starting address of the service routine.
-                    //cpu->mdr    = memory[cpu->mar]; // read the contents of the register.
-                    //cpu->pc     = cpu->mdr; // The contents of the MDR are loaded into the PC.  Load the PC with the starting address of the service routine.
-		    
-                    trap(vector8, cpu, theWindow);
-                    break;
-                case OP_JMP:
-                    cpu->pc = cpu->reg[sr1];
-                    break;
-                case OP_BR:
-                    if (setCC(nzp, cpu)) {
-                        cpu->pc += (offset);
-                    }
-                    break;
-            }
-
-            state = STORE;
-            break;
-
-        case STORE: // Look at ST. Microstate 16 is the store to memory
-            //printf("Now in STORE---------------\n");
-            switch (opcode) {
-            // write back to register or store MDR into memory
-            case OP_ADD:
-            case OP_AND: // Same as ADD
-            case OP_NOT: // Same as AND and AND.
-                //cpu->reg[dr] = cpu->mdr;
-                cpu->reg[dr] = toSign(cpu->mdr);
+                    // different opcodes require different handling
+                    // compute effective address, e.g. add sext(immed7) to register.
+                    case OP_LD:
+                        dr     = (cpu->ir >> BITSHIFT_DR) & MASK_SR2;
+                        offset = cpu->ir & MASK_PCOFFSET9;
+                        break;
+                }
+                state = EVAL_ADDR;
                 break;
 
-            case OP_LD:
-	    case OP_LDR:
-                cpu->reg[dr] = cpu->mdr; // Load into the register.
+            case EVAL_ADDR:
+                //printf("Now in EVAL_ADDR---------------\n");
+                // This phase computes the address of the memory location that is needed to process the instruction.
+                // NOTE: Study each opcode to determine what all happens this phase for that opcode.
+                // Look at the LD instruction to see microstate 2 example.
+                switch (opcode) {
+                    // different opcodes require different handling
+                    // compute effective address, e.g. add sext(immed7) to
+                    // register
+                    case OP_LD:
+                        cpu->mar = cpu->pc + offset; // microstate 2.
+                        cpu->mdr = memory[cpu->mar]; // microstate 25.
+                        break;
+                    case OP_LDR:
+                        dr       = (cpu->ir & MASK_DR)  >> BITSHIFT_DR;
+                        sr1      = (cpu->ir & MASK_SR1) >> BITSHIFT_SR1;
+                        offset   =  cpu->ir & MASK_PCOFFSET6;
+                        cpu->mar =  cpu->reg[sr1] + offset;
+                        cpu->mdr =  memory[cpu->mar];
+                        break;
+                    case OP_ST:
+                        dr       = (cpu->ir & MASK_DR) >> BITSHIFT_DR;         // This is actually a source register, but still use dr.
+                        offset   =  cpu->ir & MASK_PCOFFSET9;
+                        cpu->mar =  cpu->pc + offset; // microstate 2.
+                        break;
+                    case OP_STR:
+                        dr       = (cpu->ir  & MASK_DR)  >> BITSHIFT_DR;  //actually source register
+                        sr1      = (cpu->ir  & MASK_SR1) >> BITSHIFT_SR1;  //base register
+                        offset   =  cpu->ir  & MASK_PCOFFSET6;
+                        cpu->mar =  cpu->reg[sr1] + offset;
+                        break;
+                    case OP_LEA:
+                        dr       = (cpu->ir & MASK_DR) >> BITSHIFT_DR;
+                        offset   =  cpu->ir & MASK_PCOFFSET9;
+                        break;
+                    case OP_JSR:
+                        offset = cpu->ir & MASK_PCOFFSET11;
+                    break;
+                }
+                state = FETCH_OP;
+                break;
+                
+            case FETCH_OP:
+                //printf("Now in FETCH_OP---------------\n");
+                switch (opcode) {
+                    // get operands out of registers into A, B of ALU
+                    // or get memory for load instr.
+                    case OP_ADD:
+                    case OP_AND:
+                        dr   = (cpu->ir & MASK_DR)   >> BITSHIFT_DR;
+                        sr1  = (cpu->ir & MASK_SR1)  >> BITSHIFT_SR1;
+                        bit5 = (cpu->ir & MASK_BIT5) >> BITSHIFT_BIT5;
+                        if (bit5 == 0) {
+                            sr2 = cpu->ir & MASK_SR2; // no shift needed.
+                        } else if (bit5 == 1) {
+                            immed = cpu->ir & MASK_IMMED5; // no shift needed.
+                        }
+                        // The book page 106 says current microprocessors can be done simultaneously during fetch, but this simulator is old skool.
+                        break;
+                    case OP_NOT:
+                        dr  = (cpu->ir & MASK_DR) >> BITSHIFT_DR;
+                        sr1 = (cpu->ir & MASK_SR1) >> BITSHIFT_SR1;
+                        break;
+                    case OP_TRAP:
+                        vector8 = cpu->ir & MASK_TRAPVECT8; // No shift needed.
+                        break;
+                    case OP_LD:
+                        dr       = (cpu->ir & MASK_DR) >> BITSHIFT_DR;
+                        offset   = cpu->ir & MASK_PCOFFSET9;
+                        offset   = toSign(offset);
+                        cpu->mar = cpu->pc + offset;
+                        cpu->mdr = memory[cpu->mar];
+                        break;
+                    case OP_ST: // Same as LD.
+                    case OP_STR:
+                        // Book page 124.
+                        cpu->mdr = cpu->reg[dr];
+                        break;
+                    case OP_JMP:
+                        sr1 = (cpu->ir & MASK_SR1) >> BITSHIFT_SR1;
+                        break;
+                    case OP_BR:
+                        nzp = (cpu->ir & MASK_NZP) >> BITSHIFT_CC;
+                        offset = cpu->ir & MASK_PCOFFSET9;
+                        break;
+                    case OP_JSR:
+                        bit11 = (cpu->ir & MASK_BIT11) >> BITSHIFT_BIT11;
+                        cpu->reg[7] = cpu->pc;
+                        if (bit11 == 0) { //JSRR
+                            sr1 = (cpu->ir & MASK_SR1) >> BITSHIFT_SR1;
+                            cpu->pc = cpu->reg[sr1];
+                        } else { //JSR
+                            cpu->pc += offset;
+                        }
+                        break;
+                }
+                state = EXECUTE;
                 break;
 
-            case OP_ST:
-	    case OP_STR:
-                memory[cpu->mar] = cpu->mdr;     // Store into memory.
+            case EXECUTE: // Note that ST does not have an execute microstate.
+                //printf("Now in EXECUTE---------------\n");
+                switch (opcode) {
+                    case OP_ADD:
+                        if (bit5 == 0) {
+                            cpu->mdr = cpu->reg[sr2] + cpu->reg[sr1];
+                        } else if (bit5 == 1) {
+                            cpu->mdr = cpu->reg[sr1] + SEXT(immed, BIT_IMMED);
+                        }
+                        cpu->cc = getCC(cpu->mdr); // TODO should this be set in this phase?
+                        break;
+                    case OP_AND:
+                        if (bit5 == 0) {
+                            cpu->mdr = cpu->reg[sr2] & cpu->reg[sr1];
+                        } else if (bit5 == 1) {
+                            cpu->mdr = cpu->reg[sr1] & SEXT(immed, BIT_IMMED);
+                        }
+                        cpu->cc = getCC(cpu->mdr); // TODO should this be set in this phase?
+                        break;
+                    case OP_NOT:
+                        cpu->mdr = ~cpu->reg[sr1]; // Interpret as a negative if the leading bit is a 1.
+                        cpu->cc = getCC(cpu->mdr); // TODO should this be set in this phase?
+                        break;
+                    case OP_TRAP:
+                        // Book page 222.
+                        //vector16   = ZEXT(vector8); // TODO: should we make this actually do a zero extend to 16 bits?
+                        //cpu->mar    = vector16;
+                        cpu->reg[7] = cpu->pc; // Store the PC in R7 before loading PC with the starting address of the service routine.
+                        //cpu->mdr    = memory[cpu->mar]; // read the contents of the register.
+                        //cpu->pc     = cpu->mdr; // The contents of the MDR are loaded into the PC.  Load the PC with the starting address of the service routine.
+                        trap(vector8, cpu, theWindow);
+                        break;
+                    case OP_JMP:
+                        cpu->pc = cpu->reg[sr1];
+                        break;
+                    case OP_BR: ;
+			//TODO delete later
+			offset = SEXT(offset, BIT_PCOFFSET9);
+                        if (setCC(nzp, cpu)) {
+                            cpu->pc += (offset);
+			    
+			    
+                        }
+                        break;
+                }
+                state = STORE;
                 break;
-
-            case OP_BR:
-                // cpu->pc = cpu->mar; // TODO does this really happen in store phase?
+                
+            case STORE: // Look at ST. Microstate 16 is the store to memory
+                //printf("Now in STORE---------------\n");
+                switch (opcode) {
+                    // write back to register or store MDR into memory
+                    case OP_ADD:
+                    case OP_AND: // Same as ADD
+                    case OP_NOT: // Same as AND and AND.
+                        cpu->reg[dr] = toSign(cpu->mdr);
+                        break;
+                    case OP_LD:
+                    case OP_LDR:
+                        cpu->reg[dr] = cpu->mdr; // Load into the register.
+                        break;
+                    case OP_ST:
+                    case OP_STR:
+                        memory[cpu->mar] = cpu->mdr;     // Store into memory.
+                        break;
+                    case OP_BR:
+                        // cpu->pc = cpu->mar; // TODO does this really happen in store phase?
+                        break;
+                    case OP_LEA:
+                        cpu->reg[dr] = cpu->pc + offset;
+                        cpu->cc = getCC(cpu->reg[dr]);
+                        break;
+                }
+                // do any clean up here in prep for the next complete cycle
+                isCycleComplete = true;
+                state = FETCH;
                 break;
-	    case OP_LEA:
-		cpu->reg[dr] = cpu->pc  + offset;
-		cpu->cc = getCC(cpu->reg[dr]);
-		break;
-            }
-
-            // do any clean up here in prep for the next complete cycle
-            isCycleComplete = true;
-            state = FETCH;
-            break;
         } // end switch (state)
 
         if (isHalted) {
@@ -365,11 +351,35 @@ short toSign(unsigned short value) {
     return signedValue;
 }
 
-short SEXTimmed(unsigned short value) {
-    if(((value & NEGATIVE_IMMEDIATE) >> BITSHIFT_NEGATIVE_IMMEDIATE) == 1) {
-        return value | MASK_NEGATIVE_IMMEDIATE;
+/**
+* This function will take the loaction of the high order bit of the immediate value
+* and sign extend it so that if the high order bit is a 1, then it will be converted to
+* negative value.
+* 
+* @param value is the number to be sign extended.
+* @param instance determines what the high order bit is of the value.
+*/
+short SEXT(unsigned short theValue, int highOrderBit) {
+    short value = (short) theValue;
+    switch(highOrderBit) {
+    case BIT_IMMED:
+	if (((value & BIT_IMMED) >> BITSHIFT_NEGATIVE_IMMEDIATE) == 1) 
+            value = value | MASK_NEGATIVE_IMMEDIATE;
+	break;
+    case BIT_PCOFFSET11:
+	if (((value & BIT_PCOFFSET11) >> BITSHIFT_NEGATIVE_PCOFFSET11) == 1)
+	    value = value | MASK_NEGATIVE_PCOFFSET11;
+	break;
+    case BIT_PCOFFSET9:
+	if (((value & BIT_PCOFFSET9) >> BITSHIFT_NEGATIVE_PCOFFSET9) == 1)
+	    value = value | MASK_NEGATIVE_PCOFFSET9;
+	break;
+    case BIT_PCOFFSET6:
+	if (((value & BIT_PCOFFSET6) >> BITSHIFT_NEGATIVE_PCOFFSET6) == 1)
+	    value = value | MASK_NEGATIVE_PCOFFSET6;
+	break;
     }
-    return (short)value;
+    return value;
 }
 
 /**
@@ -467,7 +477,6 @@ unsigned short ZEXT(unsigned short value) {
     }
 }*/
 
-
 /**
  * Print out fields to the console for the CPU_p object.
  * @param cpu the cpu object containing the data.
@@ -528,8 +537,11 @@ void displayCPU(CPU_p *cpu, int memStart) {
         mvwprintw(main_win, 19, 1, "Select: 1) Load 3) Step 5) Display Mem  9) Exit");
         mvwprintw(main_win, 20, 1, "        2) Run                                 ");
         cursorAtPrompt(main_win, "");
-        mvwprintw(main_win, 23, 1, "Input                                          ");
-        mvwprintw(main_win, 24, 1, "Output                                         ");
+        if (cpu->pc == 0) {
+            // Only do a single time, else what you want to display gets obliterated.
+            mvwprintw(main_win, 23, 1, "Input                                          ");
+            mvwprintw(main_win, 24, 1, "Output                                         ");
+        }
         cursorAtPrompt(main_win, ""); // twice necessary to prevent overwrite.
 
         while(rePromptUser) {
@@ -555,6 +567,7 @@ void displayCPU(CPU_p *cpu, int memStart) {
             switch(c){
                 case '1':
                     cpuTemp = initialize();
+                    clearOutput(main_win);
                     isHalted = false;
                     cpu = &cpuTemp;
                     cursorAtPrompt(main_win, "Specify file name: ");
@@ -622,13 +635,25 @@ void cursorAtPrompt(WINDOW *theWindow, char *theText) {
 }
 
 void cursorAtInput(WINDOW *theWindow, char *theText) {
-    mvwprintw(theWindow, 23, 8, theText);
+    int input = mvwgetch(theWindow, 23, 8);
+    theText[0] = input;
     refresh();
 }
 
 void cursorAtOutput(WINDOW *theWindow, char *theText) {
-    mvwprintw(theWindow, 24, 8, theText);
+    mvwprintw(theWindow, OUTPUT_LINE_NUMBER + outputLineCounter, 8, theText);
+    outputLineCounter++;
     refresh();
+}
+
+void clearOutput(WINDOW *theWindow) {
+    int i;
+    mvwprintw(theWindow, OUTPUT_LINE_NUMBER, 1, "Output                                         ");
+    for (i = 1; i <= OUTPUT_AREA_DEPTH; i++) {
+        mvwprintw(theWindow, OUTPUT_LINE_NUMBER + i, 2, "                                              ");
+    }
+    refresh();
+    outputLineCounter = 0;
 }
 
 void cursorAtCustom(WINDOW *theWindow, int theRow, int theColumn, char *theText) {
