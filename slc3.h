@@ -4,7 +4,7 @@
  *  Date Due: May 2, 2018
  *  Authors:  Sam Brendel, Mike Josten
  *  Problem 5
- *  version: 4.30b
+ *  version: 4.30c
  */
 #include <stdio.h>
 #include <stdbool.h>
@@ -17,6 +17,7 @@
 #define FILENAME_SIZE       200
 #define STRING_SIZE         200
 #define OUTPUT_LINE_NUMBER   24
+#define OUTPUT_COL_NUMBER     8
 #define OUTPUT_AREA_DEPTH     6
 #define ADDRESS_MIN      0x3000
 #define MAX_HEX_BITS          4
@@ -117,7 +118,7 @@ short toSign(unsigned short);
 short SEXT(unsigned short, int);
 void TRAP(unsigned short, CPU_p *, WINDOW *);
 unsigned short getCC(unsigned short);
-bool setCC(unsigned short, CPU_p *);
+bool branchEnabled(unsigned short, CPU_p *);
 void displayHeader();
 FILE* openFileText(char *, WINDOW *);
 void loadProgramInstructions(FILE *, WINDOW *);
