@@ -4,7 +4,7 @@
  *  Date Due: May 2, 2018
  *  Authors:  Sam Brendel, Mike Josten
  *  Problem 5
- *  version: 4.30c
+ *  version: 4.30d
  */
 #include <stdio.h>
 #include <stdbool.h>

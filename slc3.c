@@ -4,7 +4,7 @@
  *  Date Due: May 2, 2018
  *  Authors:  Sam Brendel, Mike Josten
  *  Problem 5
- *  version: 4.30c
+ *  version: 4.30d
  */
 
 #include "slc3.h"
@@ -549,6 +549,7 @@ void displayCPU(CPU_p *cpu, int memStart) {
             // Only do a single time, else what you want to display gets obliterated.
             mvwprintw(main_win, 23, 1, "Input                                          ");
             mvwprintw(main_win, 24, 1, "Output                                         ");
+	    outputColCounter = 0;
         }
         cursorAtPrompt(main_win, ""); // twice necessary to prevent overwrite.
 
