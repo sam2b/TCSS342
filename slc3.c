@@ -4,7 +4,7 @@
  *  Date Due: May 2, 2018
  *  Authors:  Sam Brendel, Mike Josten
  *  Problem 5
- *  version: 4.29a
+ *  version: 4.30d
  */
 
 #include "slc3.h"
@@ -12,6 +12,7 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <string.h>
 #include <ncurses.h>
 #include <ctype.h>
 
@@ -19,6 +20,7 @@ unsigned short memory[MEMORY_SIZE];
 bool isHalted = false;
 bool isRun = false;
 int outputLineCounter = 0;
+int outputColCounter = 0;
 
 /**
  * Simulates trap table lookup.
@@ -48,7 +50,7 @@ void trap(unsigned short vector, CPU_p *cpu, WINDOW *theWindow) {
             break;
         case TRAP_VECTOR_X22: ;//PUTS trap command
             //printf("\nDOING TRAP X22\n");
-            char outputString[STRING_SIZE];
+            char *outputString = (char*) malloc(sizeof(char) * 40);
             short memCounter = cpu->reg[0];
             short outCounter = 0;
             /* store characters in string until character is null pointer,
@@ -61,10 +63,11 @@ void trap(unsigned short vector, CPU_p *cpu, WINDOW *theWindow) {
             }
             outputString[outCounter] = '\0';
             cursorAtOutput(theWindow, outputString);
+	    free(outputString);
             break;
         case TRAP_VECTOR_X25: // HALT
             cursorAtPrompt(theWindow, "==========HALT==========");
-            cpu->pc = 0; // reset to zero as per Prof Mobus.
+            //cpu->pc = 0; // reset to zero as per Prof Mobus.
             isHalted = true;
             isRun = false;
             break;
@@ -82,8 +85,8 @@ int controller(CPU_p *cpu, WINDOW *theWindow) {
 
     // check to make sure both pointers are not NULL
     // do any initializations here
-    unsigned int opcode, dr, sr1, sr2, bit5, bit11, offset, state, nzp;    // fields for the IR
-    unsigned short immed; // before using this value, blahblah = SEXTimmed(immed);
+    unsigned int opcode, dr, sr1, sr2, bit5, bit11, state, nzp;    // fields for the IR
+    short offset, immed;
     unsigned short vector8, vector16;
     bool isCycleComplete = false;
 
@@ -103,14 +106,6 @@ int controller(CPU_p *cpu, WINDOW *theWindow) {
                 //printf("Now in DECODE---------------\n");
                 opcode = (cpu->ir & MASK_OPCODE) >> BITSHIFT_OPCODE; // Input is the four-bit opcode IR[15:12]. The output line asserted is the one corresponding to the opcode at the input.
                 //opcode = opcode  >> BITSHIFT_OPCODE;
-                switch (opcode) {
-                    // different opcodes require different handling
-                    // compute effective address, e.g. add sext(immed7) to register.
-                    case OP_LD:
-                        dr     = (cpu->ir >> BITSHIFT_DR) & MASK_SR2;
-                        offset = cpu->ir & MASK_PCOFFSET9;
-                        break;
-                }
                 state = EVAL_ADDR;
                 break;
 
@@ -124,6 +119,9 @@ int controller(CPU_p *cpu, WINDOW *theWindow) {
                     // compute effective address, e.g. add sext(immed7) to
                     // register
                     case OP_LD:
+			dr = (cpu->ir & MASK_DR) >> BITSHIFT_DR;
+			offset = cpu->ir & MASK_PCOFFSET9;
+			offset = SEXT(offset, BIT_PCOFFSET9);
                         cpu->mar = cpu->pc + offset; // microstate 2.
                         cpu->mdr = memory[cpu->mar]; // microstate 25.
                         break;
@@ -131,26 +129,31 @@ int controller(CPU_p *cpu, WINDOW *theWindow) {
                         dr       = (cpu->ir & MASK_DR)  >> BITSHIFT_DR;
                         sr1      = (cpu->ir & MASK_SR1) >> BITSHIFT_SR1;
                         offset   =  cpu->ir & MASK_PCOFFSET6;
+			offset = SEXT(offset, BIT_PCOFFSET6);
                         cpu->mar =  cpu->reg[sr1] + offset;
                         cpu->mdr =  memory[cpu->mar];
                         break;
                     case OP_ST:
                         dr       = (cpu->ir & MASK_DR) >> BITSHIFT_DR;         // This is actually a source register, but still use dr.
                         offset   =  cpu->ir & MASK_PCOFFSET9;
+			offset = SEXT(offset, BIT_PCOFFSET9);
                         cpu->mar =  cpu->pc + offset; // microstate 2.
                         break;
                     case OP_STR:
                         dr       = (cpu->ir  & MASK_DR)  >> BITSHIFT_DR;  //actually source register
                         sr1      = (cpu->ir  & MASK_SR1) >> BITSHIFT_SR1;  //base register
                         offset   =  cpu->ir  & MASK_PCOFFSET6;
+			offset = SEXT(offset, BIT_PCOFFSET6);
                         cpu->mar =  cpu->reg[sr1] + offset;
                         break;
                     case OP_LEA:
                         dr       = (cpu->ir & MASK_DR) >> BITSHIFT_DR;
                         offset   =  cpu->ir & MASK_PCOFFSET9;
+			offset = SEXT(offset, BIT_PCOFFSET9);
                         break;
                     case OP_JSR:
                         offset = cpu->ir & MASK_PCOFFSET11;
+			offset = SEXT(offset, BIT_PCOFFSET11);
                     break;
                 }
                 state = FETCH_OP;
@@ -170,6 +173,7 @@ int controller(CPU_p *cpu, WINDOW *theWindow) {
                             sr2 = cpu->ir & MASK_SR2; // no shift needed.
                         } else if (bit5 == 1) {
                             immed = cpu->ir & MASK_IMMED5; // no shift needed.
+			    immed = SEXT(immed, BIT_IMMED);
                         }
                         // The book page 106 says current microprocessors can be done simultaneously during fetch, but this simulator is old skool.
                         break;
@@ -179,13 +183,6 @@ int controller(CPU_p *cpu, WINDOW *theWindow) {
                         break;
                     case OP_TRAP:
                         vector8 = cpu->ir & MASK_TRAPVECT8; // No shift needed.
-                        break;
-                    case OP_LD:
-                        dr       = (cpu->ir & MASK_DR) >> BITSHIFT_DR;
-                        offset   = cpu->ir & MASK_PCOFFSET9;
-                        offset   = toSign(offset);
-                        cpu->mar = cpu->pc + offset;
-                        cpu->mdr = memory[cpu->mar];
                         break;
                     case OP_ST: // Same as LD.
                     case OP_STR:
@@ -220,7 +217,7 @@ int controller(CPU_p *cpu, WINDOW *theWindow) {
                         if (bit5 == 0) {
                             cpu->mdr = cpu->reg[sr2] + cpu->reg[sr1];
                         } else if (bit5 == 1) {
-                            cpu->mdr = cpu->reg[sr1] + SEXTimmed(immed);
+                            cpu->mdr = cpu->reg[sr1] + immed;
                         }
                         cpu->cc = getCC(cpu->mdr); // TODO should this be set in this phase?
                         break;
@@ -228,7 +225,7 @@ int controller(CPU_p *cpu, WINDOW *theWindow) {
                         if (bit5 == 0) {
                             cpu->mdr = cpu->reg[sr2] & cpu->reg[sr1];
                         } else if (bit5 == 1) {
-                            cpu->mdr = cpu->reg[sr1] & SEXTimmed(immed);
+                            cpu->mdr = cpu->reg[sr1] & immed;
                         }
                         cpu->cc = getCC(cpu->mdr); // TODO should this be set in this phase?
                         break;
@@ -248,9 +245,11 @@ int controller(CPU_p *cpu, WINDOW *theWindow) {
                     case OP_JMP:
                         cpu->pc = cpu->reg[sr1];
                         break;
-                    case OP_BR:
-                        if (setCC(nzp, cpu)) {
+                    case OP_BR: ;
+			offset = SEXT(offset, BIT_PCOFFSET9);
+                        if (branchEnabled(nzp, cpu)) {
                             cpu->pc += (offset);
+			    
                         }
                         break;
                 }
@@ -264,18 +263,16 @@ int controller(CPU_p *cpu, WINDOW *theWindow) {
                     case OP_ADD:
                     case OP_AND: // Same as ADD
                     case OP_NOT: // Same as AND and AND.
-                        cpu->reg[dr] = toSign(cpu->mdr);
+                        cpu->reg[dr] = cpu->mdr;
                         break;
                     case OP_LD:
                     case OP_LDR:
                         cpu->reg[dr] = cpu->mdr; // Load into the register.
+			cpu->cc = getCC(cpu->reg[dr]);
                         break;
                     case OP_ST:
                     case OP_STR:
                         memory[cpu->mar] = cpu->mdr;     // Store into memory.
-                        break;
-                    case OP_BR:
-                        // cpu->pc = cpu->mar; // TODO does this really happen in store phase?
                         break;
                     case OP_LEA:
                         cpu->reg[dr] = cpu->pc + offset;
@@ -304,18 +301,43 @@ int controller(CPU_p *cpu, WINDOW *theWindow) {
  * @param value the value that was recently computed.
  * @return the condition code that represents the 3bit NZP as binary.
  */
-bool setCC(unsigned short nzp, CPU_p *cpu) {
-    return (
-               (cpu->cc == CONDITION_N   &&  nzp == CONDITION_N)
-            || (cpu->cc == CONDITION_Z   &&  nzp == CONDITION_Z)
-            || (cpu->cc == CONDITION_P   &&  nzp == CONDITION_P)
-            || (cpu->cc == CONDITION_NZ  && (nzp == CONDITION_N || nzp == CONDITION_Z))
-            || (cpu->cc == CONDITION_ZP  && (nzp == CONDITION_Z || nzp == CONDITION_P))
-            || (cpu->cc == CONDITION_NP  && (nzp == CONDITION_N || nzp == CONDITION_P))
-            || (cpu->cc == CONDITION_NZP && (nzp == CONDITION_N || nzp == CONDITION_Z || nzp == CONDITION_P))
-            );
+bool branchEnabled(unsigned short nzp, CPU_p *cpu) {
+    bool result = false;
+    switch(nzp) {
+    case CONDITION_NZP:
+	result = true;
+	break;
+    case CONDITION_NP:
+	if (cpu->cc == CONDITION_N || cpu->cc == CONDITION_P)
+	    result = true;
+	break;
+    case CONDITION_NZ:
+	if (cpu->cc == CONDITION_N || cpu->cc == CONDITION_Z)
+	    result = true;
+	break;
+    case CONDITION_ZP:
+	if (cpu->cc == CONDITION_Z || cpu->cc == CONDITION_P)
+	    result = true;
+	break;
+    case CONDITION_N:
+	if (cpu->cc == CONDITION_N)
+	    result = true;
+	break;
+    case CONDITION_Z:
+	if (cpu->cc == CONDITION_Z)
+	    result = true;
+	break;
+    case CONDITION_P:
+	if (cpu->cc == CONDITION_P)
+	    result = true;
+	 break;
+    }    
+    return result;
 }
 
+/**
+* This function will determine the condition code based on the value passed
+*/
 unsigned short getCC(unsigned short value) {
     short signedValue = value;
     unsigned short code;
@@ -328,14 +350,6 @@ unsigned short getCC(unsigned short value) {
     return code;
 }
 
-/**
- * Sets the PC to the designated index in memory[].
- * @param cpu the cpu object containing data.
- * @param whereTo the address where to go to.
- */
-void JUMP(CPU_p *cpu, unsigned short whereTo) {
-    cpu->pc = whereTo;
-}
 
 /**
  * This returns the same value except it is converted to a signed short instead.
@@ -345,11 +359,35 @@ short toSign(unsigned short value) {
     return signedValue;
 }
 
-short SEXTimmed(unsigned short value) {
-    if(((value & NEGATIVE_IMMEDIATE) >> BITSHIFT_NEGATIVE_IMMEDIATE) == 1) {
-        return value | MASK_NEGATIVE_IMMEDIATE;
+/**
+* This function will take the loaction of the high order bit of the immediate value
+* and sign extend it so that if the high order bit is a 1, then it will be converted to
+* negative value.
+* 
+* @param value is the number to be sign extended.
+* @param instance determines what the high order bit is of the value.
+*/
+short SEXT(unsigned short theValue, int highOrderBit) {
+    short value = (short) theValue;
+    switch(highOrderBit) {
+    case BIT_IMMED:
+	if (((value & BIT_IMMED) >> BITSHIFT_NEGATIVE_IMMEDIATE) == 1) 
+            value = value | MASK_NEGATIVE_IMMEDIATE;
+	break;
+    case BIT_PCOFFSET11:
+	if (((value & BIT_PCOFFSET11) >> BITSHIFT_NEGATIVE_PCOFFSET11) == 1)
+	    value = value | MASK_NEGATIVE_PCOFFSET11;
+	break;
+    case BIT_PCOFFSET9:
+	if (((value & BIT_PCOFFSET9) >> BITSHIFT_NEGATIVE_PCOFFSET9) == 1)
+	    value = value | MASK_NEGATIVE_PCOFFSET9;
+	break;
+    case BIT_PCOFFSET6:
+	if (((value & BIT_PCOFFSET6) >> BITSHIFT_NEGATIVE_PCOFFSET6) == 1)
+	    value = value | MASK_NEGATIVE_PCOFFSET6;
+	break;
     }
-    return (short)value;
+    return value;
 }
 
 /**
@@ -507,10 +545,11 @@ void displayCPU(CPU_p *cpu, int memStart) {
         mvwprintw(main_win, 19, 1, "Select: 1) Load 3) Step 5) Display Mem  9) Exit");
         mvwprintw(main_win, 20, 1, "        2) Run                                 ");
         cursorAtPrompt(main_win, "");
-        if (cpu->pc == 0) {
+        if (cpu->pc == 0 && !isHalted) {
             // Only do a single time, else what you want to display gets obliterated.
             mvwprintw(main_win, 23, 1, "Input                                          ");
             mvwprintw(main_win, 24, 1, "Output                                         ");
+	    outputColCounter = 0;
         }
         cursorAtPrompt(main_win, ""); // twice necessary to prevent overwrite.
 
@@ -548,7 +587,7 @@ void displayCPU(CPU_p *cpu, int memStart) {
                     refresh();
                     break;
                 case '2':
-                    cursorAtPrompt(main_win, "Option to run the program until HALT."); // TODO change the text to say something else.
+                    
                     isRun = true;
                     break;
                 case '3':
@@ -611,8 +650,20 @@ void cursorAtInput(WINDOW *theWindow, char *theText) {
 }
 
 void cursorAtOutput(WINDOW *theWindow, char *theText) {
-    mvwprintw(theWindow, OUTPUT_LINE_NUMBER + outputLineCounter, 8, theText);
-    outputLineCounter++;
+    int i;
+    char *text = (char*) malloc(sizeof(char) * 2);
+    text[1] = '\0';
+    for (i = 0; i < strlen(theText); i++) {
+	text[0] = theText[i];
+	mvwprintw(theWindow, OUTPUT_LINE_NUMBER + outputLineCounter, OUTPUT_COL_NUMBER + outputColCounter, text);
+	outputColCounter++;
+	if (theText[i] == 10) {
+	    outputLineCounter++;
+	    outputColCounter = 0;
+	}
+    }
+    //mvwprintw(theWindow, OUTPUT_LINE_NUMBER + outputLineCounter, 8, theText);
+    //outputLineCounter++;
     refresh();
 }
 
@@ -667,7 +718,7 @@ void zeroOut(unsigned short *array, int quantity) {
  */
 CPU_p initialize() {
     CPU_p cpu = { 0    // PC
-                , 0    // cc
+                , CONDITION_Z    // cc
                 , { 0, 0, 0, 0, 0, 0, 0, 0 }
                 , 0    // ir
                 , 0    // mar

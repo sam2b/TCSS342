@@ -4,7 +4,7 @@
  *  Date Due: May 2, 2018
  *  Authors:  Sam Brendel, Mike Josten
  *  Problem 5
- *  version: 4.29a
+ *  version: 4.30d
  */
 #include <stdio.h>
 #include <stdbool.h>
@@ -17,6 +17,7 @@
 #define FILENAME_SIZE       200
 #define STRING_SIZE         200
 #define OUTPUT_LINE_NUMBER   24
+#define OUTPUT_COL_NUMBER     8
 #define OUTPUT_AREA_DEPTH     6
 #define ADDRESS_MIN      0x3000
 #define MAX_HEX_BITS          4
@@ -58,6 +59,9 @@
 #define MASK_CC_Z        5
 #define MASK_CC_P        1
 #define MASK_NEGATIVE_IMMEDIATE 0xFFE0 //1111 1111 1110 0000
+#define MASK_NEGATIVE_PCOFFSET11 0xF800 //1111 1000 0000 0000
+#define MASK_NEGATIVE_PCOFFSET9 0xFE00	//1111 1110 0000 0000
+#define MASK_NEGATIVE_PCOFFSET6 0xFFC0  //1111 1111 1100 0000
 
 #define CONDITION_N   4 // 0000 1000 0000 0000
 #define CONDITION_Z   2 // 0000 0100 0000 0000
@@ -77,13 +81,19 @@
 #define BITSHIFT_CC_BIT3            2
 #define BITSHIFT_CC_BIT2            1
 #define BITSHIFT_NEGATIVE_IMMEDIATE 4
+#define BITSHIFT_NEGATIVE_PCOFFSET11 10
+#define BITSHIFT_NEGATIVE_PCOFFSET9 8
+#define BITSHIFT_NEGATIVE_PCOFFSET6 5	  
 
 #define TRAP_VECTOR_X20  0x20
 #define TRAP_VECTOR_X21  0x21
 #define TRAP_VECTOR_X22  0x22
 #define TRAP_VECTOR_X25  0x25
 
-#define NEGATIVE_IMMEDIATE 16 //0000 0000 0001 0000
+#define BIT_IMMED        16 //0000 0000 0001 0000
+#define BIT_PCOFFSET11 1024// 0000 0100 0000 0000
+#define BIT_PCOFFSET9   256// 0000 0001 0000 0000
+#define BIT_PCOFFSET6   32 // 0000 0000 0010 0000
 
 struct CPUType {
 	unsigned short int pc;     // program counter.
@@ -105,10 +115,10 @@ void zeroOut(unsigned short *array, int);
 CPU_p initialize();
 unsigned short ZEXT(unsigned short);
 short toSign(unsigned short);
-short SEXTimmed(unsigned short);
+short SEXT(unsigned short, int);
 void TRAP(unsigned short, CPU_p *, WINDOW *);
 unsigned short getCC(unsigned short);
-bool setCC(unsigned short, CPU_p *);
+bool branchEnabled(unsigned short, CPU_p *);
 void displayHeader();
 FILE* openFileText(char *, WINDOW *);
 void loadProgramInstructions(FILE *, WINDOW *);
