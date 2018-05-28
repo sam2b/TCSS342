@@ -4,7 +4,7 @@
  *  Date Due: June 1, 2018
  *  Author:  Sam Brendel
  *  Final Project
- *  version: 5.27a
+ *  version: 5.28a
  */
 
 #include "slc3.h"
@@ -15,12 +15,9 @@
 #include <string.h>
 #include <ncurses.h>
 #include <ctype.h>
+//#include <curses.h>
 
 unsigned short memory[MEMORY_SIZE];
-bool isHalted = false;
-bool isRun = false;
-int outputLineCounter = 0;
-int outputColCounter = 0;
 
 /**
  * Simulates trap table lookup.
@@ -38,7 +35,7 @@ void trap(unsigned short vector, CPU_p *cpu, WINDOW *theWindow) {
             cpu->reg[0][1] = false;
             //printf("\nDOING TRAP X20\n");
             free(input);
-            echo(); //turn echo back on.
+            //echo(); //turn echo back on.
             break;
         case TRAP_VECTOR_X21: ;// OUT
             /* put R0 value into char variable, then send to "cursor" function */
@@ -76,6 +73,7 @@ void trap(unsigned short vector, CPU_p *cpu, WINDOW *theWindow) {
             cursorAtPrompt(theWindow, "Error: Unknown Trap vector");
             break;
     }
+    echo(); //turn echo back on.
 }
 
 /**
@@ -234,16 +232,12 @@ int controller(CPU_p *cpu, WINDOW *theWindow) {
                         break;
                     case OP_NOT:
                         cpu->mdr = ~cpu->reg[sr1][0]; // Interpret as a negative if the leading bit is a 1.
-                        cpu->cc = getCC(cpu->mdr); // TODO should this be set in this phase?
+                        cpu->cc = getCC(cpu->mdr);
                         break;
                     case OP_TRAP:
                         // Book page 222.
-                        //vector16   = ZEXT(vector8); // TODO: should we make this actually do a zero extend to 16 bits?
-                        //cpu->mar    = vector16;
                         cpu->reg[REGISTER_7][0] = cpu->pc; // Store the PC in R7 before loading PC with the starting address of the service routine.
                         cpu->reg[REGISTER_7][1] = true;
-                        //cpu->mdr    = memory[cpu->mar]; // read the contents of the register.
-                        //cpu->pc     = cpu->mdr; // The contents of the MDR are loaded into the PC.  Load the PC with the starting address of the service routine.
                         trap(vector8, cpu, theWindow);
                         break;
                     case OP_JMP: // includes RET.
@@ -430,24 +424,26 @@ unsigned short ZEXT(unsigned short value) {
  * @param cpu the cpu object containing the data.
  */
 void displayCPU(CPU_p *cpu, int memStart) {
-    int c;
-    int hexExit;
-    isHalted = false; // TODO does this affect anything adversely?
+    int c, hexExit, menuSelection = 0, newStart = 0, editAddress = 0, editValue = 0;
+    isHalted = false;
+    bool rePromptUser = true;
+    bool rePromptHex = true;
+    char inputMemAddress[4];
+    char inputMemValue[4];
+    char *fileName = malloc(FILENAME_SIZE * sizeof(char)); //char fileName[FILENAME_SIZE];
     initscr();
     cbreak();
     clear();
-    WINDOW *main_win = newwin(32, 49, 0, 0);
+    WINDOW *main_win = newwin(WINDOW_WIDTH, WINDOW_LEGTH, 0, 0); //(32, 49, 0, 0)
     box(main_win, 0, 0);
     refresh();
 
     while(1) {
-        bool rePromptUser = true;
-        bool rePromptHex = true;
-        int menuSelection = 0;
-        int newStart = 0;
-        char inStart[4];
-        char *fileName = malloc(FILENAME_SIZE * sizeof(char)); //char fileName[FILENAME_SIZE];
-        mvwprintw(main_win, 1, 1,  "Welcome to the LC-3 Simulator Simulator");
+        rePromptUser = true;
+        rePromptHex = true;
+        menuSelection = 0;
+        newStart = 0;
+        mvwprintw(main_win, 1, 1,  "Welcome to the LC-3 Samulator Simulator");
         mvwprintw(main_win, 2, 1,  "Registers");
         mvwprintw(main_win, 2, 31, "Memory");
 
@@ -471,11 +467,14 @@ void displayCPU(CPU_p *cpu, int memStart) {
         }
 
         // Next 4 lines.
-        mvwprintw(main_win, 14, 1, "PC:  x%04X    IR: x%04X    x%04X: x%04X", cpu->pc+ADDRESS_START, cpu->ir, i+memStart, memory[i+(memStart-ADDRESS_START)]);
+        mvwprintw(main_win, 14, 1, "PC:  x%04X    IR: x%04X    x%04X: x%04X"
+                , cpu->pc+ADDRESS_START, cpu->ir, i+memStart, memory[i+(memStart-ADDRESS_START)]);
         i++;
-        mvwprintw(main_win, 15, 1, "A:   x%04X     B: x%04X    x%04X: x%04X", cpu->A, cpu->B, i+memStart, memory[i+(memStart - ADDRESS_START)]);
+        mvwprintw(main_win, 15, 1, "A:   x%04X     B: x%04X    x%04X: x%04X"
+                , cpu->A, cpu->B, i+memStart, memory[i+(memStart - ADDRESS_START)]);
         i++;
-        mvwprintw(main_win, 16, 1, "MAR: x%04X   MDR: x%04X    x%04X: x%04X", cpu->mar+ADDRESS_START, cpu->ir, i+memStart, memory[i+(memStart-ADDRESS_START)]);
+        mvwprintw(main_win, 16, 1, "MAR: x%04X   MDR: x%04X    x%04X: x%04X"
+                , cpu->mar+ADDRESS_START, cpu->ir, i+memStart, memory[i+(memStart-ADDRESS_START)]);
         i++;
         mvwprintw(main_win, 17, 1, "CC:  N:%d Z:%d P:%d           x%04X: x%04X",
                 (cpu->cc >> BITSHIFT_CC_BIT3) & MASK_CC_N,
@@ -487,14 +486,13 @@ void displayCPU(CPU_p *cpu, int memStart) {
 
         // Last 2 lines.
         mvwprintw(main_win, 18, 28, "x%04X: x%04X", i+memStart, memory[i + (memStart - ADDRESS_START)]);
-        mvwprintw(main_win, 19, 1, "Select: 1) Load 3) Step 5) Display Mem  9) Exit");
-        mvwprintw(main_win, 20, 1, "        2) Run                                 ");
+        mvwprintw(main_win, 19, 1, "Select: 1) Load 2) Save 3) Step 5) DisplayMem 6) Edit 7) Run 9) Exit");
         cursorAtPrompt(main_win, "");
         if (cpu->pc == 0 && !isHalted) {
             // Only do a single time, else what you want to display gets obliterated.
-            mvwprintw(main_win, 23, 1, "Input                                          ");
-            mvwprintw(main_win, 24, 1, "Output                                         ");
-        outputColCounter = 0;
+            mvwprintw(main_win, 23, 1, "Input                                                               ");
+            mvwprintw(main_win, 24, 1, "Output                                                             ");
+            outputColCounter = 0;
         }
         cursorAtPrompt(main_win, ""); // twice necessary to prevent overwrite.
 
@@ -519,7 +517,7 @@ void displayCPU(CPU_p *cpu, int memStart) {
             box(main_win, 0, 0);
             refresh();
             switch(c){
-                case '1':
+                case '1': // Load.
                     cpuTemp = initialize();
                     clearOutput(main_win);
                     isHalted = false;
@@ -531,39 +529,86 @@ void displayCPU(CPU_p *cpu, int memStart) {
                     box(main_win, 0, 0);
                     refresh();
                     break;
-                case '2':
-                    
-                    isRun = true;
+                case '2': // Save
+                    printf(" ");
                     break;
-                case '3':
-                    //printf("CASE3\n"); // do nothing.  Just let the PC run the next instruction.
+                case '3': // Step.
                     controller(cpu, main_win); // invoke exclusively in case 3.
                     break;
-                case '5':
+                case '5': // DisplayMem.
                     while (rePromptHex) {
                         //mvwprintw(main_win, 21, 1, "Push Q to return to main menu.");
                         //mvwprintw(main_win, 22, 1, "New Starting Address: x");
                         cursorAtPrompt(main_win, "New Starting Address: ");
-                        wgetstr(main_win, inStart);
+                        wgetstr(main_win, inputMemAddress);
                         box(main_win, 0, 0);
                         refresh();
-                        if (inStart[0] == 'q' || inStart[0] == 'Q') {
+                        if (inputMemAddress[0] == 'q' || inputMemAddress[0] == 'Q') {
+                            cursorAtPrompt(main_win, "");
+                            //rePromptUser = true;
+                            break;
+                        }
+                        if (hexCheck(inputMemAddress)) {
+                            newStart = strtol(inputMemAddress, NULL, HEX_BITS);
+                            displayCPU(cpu, newStart);
+                            break;
+                        } else {
+                            cursorAtPrompt(main_win, "You must enter a 4-digit hex value. Try again. ");
+                            continue;
+                        }
+                    }
+                    rePromptHex = true;
+                    break;
+                case '6': // Edit.
+                    clearOutput(main_win);
+                    while (rePromptHex) {
+                        cursorAtPrompt(main_win, "Edit Memory Address: ");
+                        wgetstr(main_win, inputMemAddress);
+                        refresh();
+                        if (inputMemAddress[0] == 'q' || inputMemAddress[0] == 'Q') {
                             cursorAtPrompt(main_win, "");
                             rePromptUser = true;
                             break;
                         }
-                        if (hexCheck(inStart)) {
-                            newStart = strtol(inStart, NULL, MAX_BIN_BITS);
-                            displayCPU(cpu, newStart);
+                        if (hexCheck(inputMemAddress)) {
+                            editAddress = strtol(inputMemAddress, NULL, HEX_BITS);
                         } else {
                             cursorAtPrompt(main_win, "You must enter a 4-digit hex value. Try again. ");
                             rePromptHex = true;
+                            continue;
                         }
+
+                        mvwprintw(main_win, OUTPUT_LINE_NUMBER, OUTPUT_COL_NUMBER, "Old value for address: x%04X"
+                                , memory[editAddress - ADDRESS_START]);
+                        outputColCounter++;
+                        //cursorAtOutput(main_win, "Old value for address: blah");
+                        cursorAtPrompt(main_win, "Enter new hex value: ");
+                        refresh();
+                        wgetstr(main_win, inputMemValue);
+                        if (inputMemValue[0] == 'q' || inputMemValue[0] == 'Q') {
+                            cursorAtPrompt(main_win, "");
+                            break;
+                        }
+
+                        if (hexCheck(inputMemValue)) {
+                            editValue = strtol(inputMemValue, NULL, HEX_BITS);
+                        } else {
+                            cursorAtPrompt(main_win, "You must enter a 4-digit hex value. Try again. ");
+                            clearOutput(main_win);
+                            continue;
+                        }
+                        memory[editAddress - ADDRESS_START] = editValue;
+                        cursorAtOutput(main_win, "Done.");
+                        refresh();
+                        break;
                     }
-                    //printf("CASE5\n"); // Update the window for the memory registers.
+                    rePromptHex = true;
                     break;
-                case '9':
-                    //printf("CASE9\n");
+                case '7': // Run.
+                    isRun = true;
+                    break;
+                case '9': // Exit.
+                    echo(); //turn echo back on.
                     endwin();
                     printf("Bubye\n");
                     exit(0);
@@ -614,9 +659,11 @@ void cursorAtOutput(WINDOW *theWindow, char *theText) {
 
 void clearOutput(WINDOW *theWindow) {
     int i;
-    mvwprintw(theWindow, OUTPUT_LINE_NUMBER, 1, "Output                                         ");
+    mvwprintw(theWindow, OUTPUT_LINE_NUMBER, 1
+            , "Output                                                              ");
     for (i = 1; i <= OUTPUT_AREA_DEPTH; i++) {
-        mvwprintw(theWindow, OUTPUT_LINE_NUMBER + i, 2, "                                              ");
+        mvwprintw(theWindow, OUTPUT_LINE_NUMBER + i, 2
+                , "                                                                    ");
     }
     refresh();
     outputLineCounter = 0;
@@ -737,7 +784,7 @@ void loadProgramInstructions(FILE *inputFile, WINDOW *theWindow) {
            a result of the .ORIG instruction in assembly. */
         if(!feof(inputFile)) {
             fgets(instruction, length, inputFile);
-            startingAddress = strtol(instruction, NULL, MAX_BIN_BITS);
+            startingAddress = strtol(instruction, NULL, HEX_BITS);
             fgets(instruction, length, inputFile); // processes the carriage return character.
         }
 
@@ -746,7 +793,7 @@ void loadProgramInstructions(FILE *inputFile, WINDOW *theWindow) {
             i = (startingAddress - ADDRESS_START);
             while(!feof(inputFile)) {
                 fgets(instruction, length, inputFile);
-                memory[i] = strtol(instruction, NULL, MAX_BIN_BITS);
+                memory[i] = strtol(instruction, NULL, HEX_BITS);
                 //printf("\n %04X", memory[i]); // debugging, confirms the memory[] does have the data.
                 fgets(instruction, length, inputFile); // processes the carriage return character.
                 i++;

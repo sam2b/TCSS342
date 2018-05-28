@@ -4,11 +4,13 @@
  *  Date Due: June 1, 2018
  *  Author:  Sam Brendel
  *  Final Project
- *  version: 5.27a
+ *  version: 5.28a
  */
+
 #include <stdio.h>
 #include <stdbool.h>
 #include <ncurses.h>
+//#include <curses.h>
 
 #ifndef SLC3_H_
 #define SLC3_H_
@@ -22,9 +24,16 @@
 #define OUTPUT_AREA_DEPTH     6
 #define ADDRESS_START      0x3000
 #define MAX_HEX_BITS          4
-#define MAX_BIN_BITS         16
+#define HEX_BITS         16
 #define REGISTER_6            6 // Exclusively used for the stack.
 #define REGISTER_7            7
+#define WINDOW_WIDTH         86
+#define WINDOW_LEGTH         50
+#define COLUMN_LABEL_MEMORY  31
+#define COLUMN_LABEL_REGISTERS 1
+#define COLUMN_LABEL_TITLE 1
+#define TRUE 1
+#define FALSE 0
 
 #define FETCH     0
 #define DECODE    1
@@ -116,6 +125,11 @@ struct CPUType {
 };
 
 typedef struct CPUType CPU_p;
+
+bool isHalted = false;
+bool isRun = false;
+int outputLineCounter = 0;
+int outputColCounter = 0;
 
 bool  branchEnabled(unsigned short, CPU_p *);
 void  clearOutput(WINDOW *);
