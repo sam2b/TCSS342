@@ -1,0 +1,1 @@
+rm slc3.exe & gcc -g -o slc3.exe slc3.c slc3.h -lncurses -lmenu -lm && ./slc3.exe
