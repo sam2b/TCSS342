@@ -4,7 +4,7 @@
  *  Date Due: June 1, 2018
  *  Author:  Sam Brendel
  *  Final Project
- *  version: 5.28a
+ *  version: 5.28b
  */
 
 #include <stdio.h>
@@ -115,7 +115,7 @@
 struct CPUType {
     unsigned short int pc;     // program counter.
     unsigned short cc;         // condition code for BR instruction.
-    unsigned short int reg[8][2]; // registers.
+    unsigned short int reg[8][2]; // registers. Element [n][1] boolean denotes if the value is a memory address.
     unsigned short int ir;     // instruction register.
     unsigned short mar;        // memory address register.
     unsigned short mdr;        // memory data register.
@@ -148,6 +148,7 @@ short sext(unsigned short, int);
 short toSign(unsigned short);
 void  trap(unsigned short, CPU_p *, WINDOW *);
 void  zeroOutMemory(unsigned short *);
+void  resetBreakPoints(unsigned char *);
 //void  zeroRegisters(unsigned short *[8][2]);
 unsigned short getCC(unsigned short);
 unsigned short ZEXT(unsigned short);

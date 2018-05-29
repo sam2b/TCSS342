@@ -4,7 +4,7 @@
  *  Date Due: June 1, 2018
  *  Author:  Sam Brendel
  *  Final Project
- *  version: 5.28a
+ *  version: 5.28b
  */
 
 #include "slc3.h"
@@ -15,9 +15,12 @@
 #include <string.h>
 #include <ncurses.h>
 #include <ctype.h>
-//#include <curses.h>
 
+
+// Represents system memory outside of the CPU.
 unsigned short memory[MEMORY_SIZE];
+// A symbolic value representing a position in memory if the user has set a breakpoint.
+char breakPoint[MEMORY_SIZE];
 
 /**
  * Simulates trap table lookup.
@@ -424,13 +427,12 @@ unsigned short ZEXT(unsigned short value) {
  * @param cpu the cpu object containing the data.
  */
 void displayCPU(CPU_p *cpu, int memStart) {
-    int c, hexExit, menuSelection = 0, newStart = 0, editAddress = 0, editValue = 0;
+    int c, hexExit, menuSelection = 0;
     isHalted = false;
     bool rePromptUser = true;
     bool rePromptHex = true;
-    char inputMemAddress[4];
-    char inputMemValue[4];
     char *fileName = malloc(FILENAME_SIZE * sizeof(char)); //char fileName[FILENAME_SIZE];
+    char breakPointMark;
     initscr();
     cbreak();
     clear();
@@ -442,12 +444,11 @@ void displayCPU(CPU_p *cpu, int memStart) {
         rePromptUser = true;
         rePromptHex = true;
         menuSelection = 0;
-        newStart = 0;
         mvwprintw(main_win, 1, 1,  "Welcome to the LC-3 Samulator Simulator");
         mvwprintw(main_win, 2, 1,  "Registers");
         mvwprintw(main_win, 2, 31, "Memory");
 
-        // First 8 lines
+        // First 8 lines of Registers and Memory.
         int i = 0, offsetMemoryAddress = 0;
         for(i = 0; i < 8; i++) {
             if (cpu->reg[i][1] == true) {
@@ -456,42 +457,58 @@ void displayCPU(CPU_p *cpu, int memStart) {
                 offsetMemoryAddress = 0;
             }
             mvwprintw(main_win, 3+i, 1, "R%u: x%04X", i, cpu->reg[i][0]+offsetMemoryAddress);   // Registers.
-            mvwprintw(main_win, 3+i, 28, "x%04X: x%04X", i+memStart, memory[i + (memStart - ADDRESS_START)]); // Memory.
+            mvwprintw(main_win, 3+i, 26, "%c x%04X: x%04X"
+                    , breakPoint[i+(memStart-ADDRESS_START)]
+                    , i+memStart
+                    , memory[i+(memStart-ADDRESS_START)]); // Memory.
         }
 
-        // Next 3 lines
+        // Next 3 lines of Memory.
         int j = 0;
         for (j = 0; j < 3; j++) {
-            mvwprintw(main_win, 11+j, 28, "x%04X: x%04X", i+memStart, memory[i + (memStart - ADDRESS_START)]);
+            mvwprintw(main_win, 11+j, 26, "%c x%04X: x%04X"
+                    , breakPoint[i+(memStart-ADDRESS_START)]
+                    , i+memStart
+                    , memory[i+(memStart-ADDRESS_START)]);
             i++;
         }
 
-        // Next 4 lines.
-        mvwprintw(main_win, 14, 1, "PC:  x%04X    IR: x%04X    x%04X: x%04X"
-                , cpu->pc+ADDRESS_START, cpu->ir, i+memStart, memory[i+(memStart-ADDRESS_START)]);
+        // Next 4 lines of Registers and Memory.
+        mvwprintw(main_win, 14, 1, "PC:  x%04X    IR: x%04X  %c x%04X: x%04X"
+                , cpu->pc+ADDRESS_START
+                , cpu->ir, breakPoint[i+(memStart-ADDRESS_START)]
+                , i+memStart
+                , memory[i+(memStart-ADDRESS_START)]);
         i++;
-        mvwprintw(main_win, 15, 1, "A:   x%04X     B: x%04X    x%04X: x%04X"
-                , cpu->A, cpu->B, i+memStart, memory[i+(memStart - ADDRESS_START)]);
+        mvwprintw(main_win, 15, 1, "A:   x%04X     B: x%04X  %c x%04X: x%04X"
+                , cpu->A, cpu->B, breakPoint[i+(memStart-ADDRESS_START)], i+memStart, memory[i+(memStart-ADDRESS_START)]);
         i++;
-        mvwprintw(main_win, 16, 1, "MAR: x%04X   MDR: x%04X    x%04X: x%04X"
-                , cpu->mar+ADDRESS_START, cpu->ir, i+memStart, memory[i+(memStart-ADDRESS_START)]);
+        mvwprintw(main_win, 16, 1, "MAR: x%04X   MDR: x%04X  %c x%04X: x%04X"
+                , cpu->mar+ADDRESS_START
+                , cpu->ir, breakPoint[i+(memStart-ADDRESS_START)]
+                , i+memStart
+                , memory[i+(memStart-ADDRESS_START)]);
         i++;
-        mvwprintw(main_win, 17, 1, "CC:  N:%d Z:%d P:%d           x%04X: x%04X",
-                (cpu->cc >> BITSHIFT_CC_BIT3) & MASK_CC_N,
-                (cpu->cc >> BITSHIFT_CC_BIT2) & MASK_CC_Z,
-                 cpu->cc  & MASK_CC_P,
-                 i+ADDRESS_START,
-                 memory[i+(memStart-ADDRESS_START)]);
+        mvwprintw(main_win, 17, 1, "CC:  N:%d Z:%d P:%d         %c x%04X: x%04X",
+                  (cpu->cc >> BITSHIFT_CC_BIT3) & MASK_CC_N
+                , (cpu->cc >> BITSHIFT_CC_BIT2) & MASK_CC_Z
+                , cpu->cc  & MASK_CC_P
+                , breakPoint[i+(memStart-ADDRESS_START)]
+                , i+memStart //ADDRESS_START
+                , memory[i+(memStart-ADDRESS_START)]);
         i++;
 
-        // Last 2 lines.
-        mvwprintw(main_win, 18, 28, "x%04X: x%04X", i+memStart, memory[i + (memStart - ADDRESS_START)]);
-        mvwprintw(main_win, 19, 1, "Select: 1) Load 2) Save 3) Step 5) DisplayMem 6) Edit 7) Run 9) Exit");
+        // Last 2 lines of Memory.
+        mvwprintw(main_win, 18, 26, "%c x%04X: x%04X"
+                , breakPoint[i+(memStart-ADDRESS_START)]
+                , i+memStart
+                , memory[i+(memStart-ADDRESS_START)]);
+        mvwprintw(main_win, 19, 1, "Select: 1) Load 2) Save 3) Step 5) DisplayMem 6) Edit 7) Run 8) (Un)SetBrkpt 9) Exit");
         cursorAtPrompt(main_win, "");
         if (cpu->pc == 0 && !isHalted) {
             // Only do a single time, else what you want to display gets obliterated.
-            mvwprintw(main_win, 23, 1, "Input                                                               ");
-            mvwprintw(main_win, 24, 1, "Output                                                             ");
+            mvwprintw(main_win, 23, 1, "Input                                                                               ");
+            mvwprintw(main_win, 24, 1, "Output                                                                             ");
             outputColCounter = 0;
         }
         cursorAtPrompt(main_win, ""); // twice necessary to prevent overwrite.
@@ -508,9 +525,14 @@ void displayCPU(CPU_p *cpu, int memStart) {
             move(24, 1);
             clrtoeol();
             noecho();
-            if (isRun) {
+            if (isRun && !isHalted && (breakPoint[cpu->pc] != '*')) {
                 c = '3'; // keep stepping until TRAP x25 is hit.
             } else {
+                isRun = false;
+                if (breakPoint[cpu->pc] == '*') {
+                    cursorAtPrompt(main_win, "Press Step to proceed.");
+                    refresh();
+                }
                 c = wgetch(main_win); // This is what stops to prompt the user for an Option input.
             }
             echo();
@@ -537,6 +559,8 @@ void displayCPU(CPU_p *cpu, int memStart) {
                     break;
                 case '5': // DisplayMem.
                     while (rePromptHex) {
+                        char inputMemAddress[4];
+                        int newStart = 0;
                         //mvwprintw(main_win, 21, 1, "Push Q to return to main menu.");
                         //mvwprintw(main_win, 22, 1, "New Starting Address: x");
                         cursorAtPrompt(main_win, "New Starting Address: ");
@@ -562,6 +586,8 @@ void displayCPU(CPU_p *cpu, int memStart) {
                 case '6': // Edit.
                     clearOutput(main_win);
                     while (rePromptHex) {
+                        char inputMemAddress[4], inputMemValue[4];
+                        int editAddress = 0, editValue = 0;
                         cursorAtPrompt(main_win, "Edit Memory Address: ");
                         wgetstr(main_win, inputMemAddress);
                         refresh();
@@ -589,7 +615,6 @@ void displayCPU(CPU_p *cpu, int memStart) {
                             cursorAtPrompt(main_win, "");
                             break;
                         }
-
                         if (hexCheck(inputMemValue)) {
                             editValue = strtol(inputMemValue, NULL, HEX_BITS);
                         } else {
@@ -606,6 +631,50 @@ void displayCPU(CPU_p *cpu, int memStart) {
                     break;
                 case '7': // Run.
                     isRun = true;
+                    break;
+                case '8': // Break Point.
+                    clearOutput(main_win);
+                    while (rePromptHex) {
+                        char inputMemAddress[4];
+                        int editAddress = 0;
+                        char *breakPointStatus = (char*) malloc(sizeof(char) * 3);
+                        cursorAtPrompt(main_win, "Toggle Breakpoint at Memory Address: ");
+                        wgetstr(main_win, inputMemAddress);
+                        refresh();
+                        if (inputMemAddress[0] == 'q' || inputMemAddress[0] == 'Q') {
+                            cursorAtPrompt(main_win, "");
+                            rePromptUser = true;
+                            break;
+                        }
+                        if (hexCheck(inputMemAddress)) {
+                            editAddress = strtol(inputMemAddress, NULL, HEX_BITS);
+                        } else {
+                            cursorAtPrompt(main_win, "You must enter a 4-digit hex value. Try again. ");
+                            rePromptHex = true;
+                            continue;
+                        }
+
+                        if (breakPoint[editAddress - ADDRESS_START] == '*') {
+                            breakPoint[editAddress - ADDRESS_START] = ' ';
+                        } else {
+                            breakPoint[editAddress - ADDRESS_START] = '*';
+                        }
+
+                        if (breakPoint[editAddress - ADDRESS_START] == '*') {
+                            breakPointStatus = "ON ";
+                        } else {
+                            breakPointStatus = "OFF";
+                        }
+
+                        mvwprintw(main_win, OUTPUT_LINE_NUMBER, OUTPUT_COL_NUMBER, "Breakpoint set to %s for address: x%04X"
+                                , breakPointStatus, memory[editAddress - ADDRESS_START]);
+                        outputColCounter++;
+                        //free(breakPointStatus); // BUG this causes a seg fault for some unknown reason.
+                        cursorAtOutput(main_win, "Done.");
+                        refresh();
+                        break;
+                    }
+                    rePromptHex = true;
                     break;
                 case '9': // Exit.
                     echo(); //turn echo back on.
@@ -705,6 +774,16 @@ void zeroOutMemory(unsigned short *array) {
     }
 }
 
+/**
+ * Sets all elements to false.
+ */
+void resetBreakPoints(unsigned char *array) {
+    int i;
+    for (i = 0; i < MEMORY_SIZE; i++) {
+        breakPoint[i] = ' ';
+    }
+}
+
 /*void zeroRegisters(unsigned short *array[8][2]) {
     int i;
     for (i = 0; i < REGISTER_SIZE; i++) {
@@ -729,11 +808,13 @@ CPU_p initialize() {
                 , 0};  // mdr
 
     zeroOutMemory(memory);
+    resetBreakPoints(breakPoint);
+
     //zeroRegisters(cpu.reg);
-    int i;
-    for (i = 0; i < REGISTER_SIZE; i++) {
-        cpu.reg[i][0] = 0;
-        cpu.reg[i][1] = false;
+    int j;
+    for (j = 0; j < REGISTER_SIZE; j++) {
+        cpu.reg[j][0] = 0;
+        cpu.reg[j][1] = false;
     }
     return cpu;
 }
