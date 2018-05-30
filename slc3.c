@@ -4,7 +4,7 @@
  *  Date Due: June 1, 2018
  *  Author:  Sam Brendel
  *  Final Project
- *  version: 5.28b
+ *  version: 5.29a
  */
 
 #include "slc3.h"
@@ -67,7 +67,7 @@ void trap(unsigned short vector, CPU_p *cpu, WINDOW *theWindow) {
             free(outputString);
             break;
         case TRAP_VECTOR_X25: // HALT
-            cursorAtPrompt(theWindow, "==========HALT==========");
+            cursorAtPrompt(theWindow, "========HALT========");
             //cpu->pc = 0; // reset to zero as per Prof Mobus.
             isHalted = true;
             isRun = false;
@@ -87,7 +87,7 @@ int controller(CPU_p *cpu, WINDOW *theWindow) {
 
     // check to make sure both pointers are not NULL
     // do any initializations here
-    unsigned int opcode, dr, sr1, sr2, bit5, bit11, state, nzp;    // fields for the IR
+    unsigned int opcode, dr, sr1, sr2, bit5, bit11, state, nzp, stackPointer;    // fields for the IR
     short offset, immed;
     unsigned short vector8, vector16;
     bool isCycleComplete = false;
@@ -157,6 +157,20 @@ int controller(CPU_p *cpu, WINDOW *theWindow) {
                         break;
                     case OP_JSR: // includes JSRR.
                         offset = sext(cpu->ir & MASK_PCOFFSET11, BIT_PCOFFSET11);
+                        break;
+                    case OP_PP:
+                        // R6 is exclusively used as the stack pointer, and is already initialized to the last memory[] element.
+                        // The stack shall begin at the last element in memory[].
+                        // The first stack item begins at one element before the last element.
+                        bit5 = (cpu->ir & MASK_BIT5) >> BITSHIFT_BIT5;
+                        stackPointer = cpu->ir & MASK_PP;
+                        if (bit5 == 0) {
+                            // Push.
+                            sr1 = (cpu->ir & MASK_SR1) >> BITSHIFT_SR1;
+                        } else {
+                            // Pop.
+                            dr = (cpu->ir & MASK_DR) >> BITSHIFT_DR;
+                        }
                         break;
                 }
                 state = FETCH_OP;
@@ -253,15 +267,18 @@ int controller(CPU_p *cpu, WINDOW *theWindow) {
                         }
                         break;
                     case OP_PP:
-                        bit5 = (cpu->ir & MASK_BIT5) >> BITSHIFT_BIT5;
                         if (bit5 == 0) {
-                            // Push onto the stack.
+                            // Push.
                             cpu->reg[REGISTER_6][0]--;
-                            memory[cpu->reg[REGISTER_6][0]] = sr1;
-                        } else { // bit5 == 1
-                            // POP
-                            dr = memory[cpu->reg[REGISTER_6][0]];
-                            cpu->reg[REGISTER_6][0]++;
+                            // Store phase does the write-back into memory.
+                        } else {
+                            // Pop.
+                            cpu->reg[dr][0] = memory[cpu->reg[stackPointer][0]];
+                            memory[cpu->reg[stackPointer][0]] = 0; // wipe it clean.
+                            if (cpu->reg[stackPointer][0] < (MEMORY_SIZE-ADDRESS_START)) {
+                                cpu->reg[stackPointer][0]++;
+                                // Do not increment when the stack is empty.
+                            }
                         }
                         break;
                 }
@@ -297,6 +314,15 @@ int controller(CPU_p *cpu, WINDOW *theWindow) {
                         cpu->reg[dr][0] = cpu->pc + offset;
                         cpu->reg[dr][1] = true;
                         cpu->cc = getCC(cpu->reg[dr][0]);
+                        break;
+                    case OP_PP:
+                        // R6 is exclusively used as the stack pointer, and is already initialized to 0xFFFF.
+                        // The stack shall begin at the last element in memory[].
+                        // The first stack item begins at one element before 0xFFFF.
+                        if (bit5 == 0) {
+                            // Push onto the stack.
+                            memory[cpu->reg[REGISTER_6][0]] = cpu->reg[sr1][0];
+                        }
                         break;
                 }
                 // do any clean up here in prep for the next complete cycle
@@ -436,7 +462,7 @@ void displayCPU(CPU_p *cpu, int memStart) {
     initscr();
     cbreak();
     clear();
-    WINDOW *main_win = newwin(WINDOW_WIDTH, WINDOW_LEGTH, 0, 0); //(32, 49, 0, 0)
+    WINDOW *main_win = newwin(WINDOW_LEGTH, WINDOW_WIDTH, 0, 0); //(32, 49, 0, 0)
     box(main_win, 0, 0);
     refresh();
 
@@ -503,12 +529,12 @@ void displayCPU(CPU_p *cpu, int memStart) {
                 , breakPoint[i+(memStart-ADDRESS_START)]
                 , i+memStart
                 , memory[i+(memStart-ADDRESS_START)]);
-        mvwprintw(main_win, 19, 1, "Select: 1) Load 2) Save 3) Step 5) DisplayMem 6) Edit 7) Run 8) (Un)SetBrkpt 9) Exit");
+        mvwprintw(main_win, 19, 1, "Select: 1)Load  2)Save  3)Step  5)DisplayMem  6)Edit  7)Run  8)SetBrkpt  9)Exit");
         cursorAtPrompt(main_win, "");
         if (cpu->pc == 0 && !isHalted) {
             // Only do a single time, else what you want to display gets obliterated.
-            mvwprintw(main_win, 23, 1, "Input                                                                               ");
-            mvwprintw(main_win, 24, 1, "Output                                                                             ");
+            mvwprintw(main_win, 23, 1, "Input                                                                           ");
+            mvwprintw(main_win, 24, 1, "Output                                                                         ");
             outputColCounter = 0;
         }
         cursorAtPrompt(main_win, ""); // twice necessary to prevent overwrite.
@@ -577,7 +603,7 @@ void displayCPU(CPU_p *cpu, int memStart) {
                             displayCPU(cpu, newStart);
                             break;
                         } else {
-                            cursorAtPrompt(main_win, "You must enter a 4-digit hex value. Try again. ");
+                            cursorAtOutput(main_win, "You must enter a 4-digit hex value. Try again. ");
                             continue;
                         }
                     }
@@ -599,7 +625,7 @@ void displayCPU(CPU_p *cpu, int memStart) {
                         if (hexCheck(inputMemAddress)) {
                             editAddress = strtol(inputMemAddress, NULL, HEX_BITS);
                         } else {
-                            cursorAtPrompt(main_win, "You must enter a 4-digit hex value. Try again. ");
+                            cursorAtOutput(main_win, "You must enter a 4-digit hex value. Try again. ");
                             rePromptHex = true;
                             continue;
                         }
@@ -618,12 +644,12 @@ void displayCPU(CPU_p *cpu, int memStart) {
                         if (hexCheck(inputMemValue)) {
                             editValue = strtol(inputMemValue, NULL, HEX_BITS);
                         } else {
-                            cursorAtPrompt(main_win, "You must enter a 4-digit hex value. Try again. ");
+                            cursorAtOutput(main_win, "You must enter a 4-digit hex value. Try again. ");
                             clearOutput(main_win);
                             continue;
                         }
                         memory[editAddress - ADDRESS_START] = editValue;
-                        cursorAtOutput(main_win, "Done.");
+                        //cursorAtOutput(main_win, "Done.");
                         refresh();
                         break;
                     }
@@ -649,7 +675,7 @@ void displayCPU(CPU_p *cpu, int memStart) {
                         if (hexCheck(inputMemAddress)) {
                             editAddress = strtol(inputMemAddress, NULL, HEX_BITS);
                         } else {
-                            cursorAtPrompt(main_win, "You must enter a 4-digit hex value. Try again. ");
+                            cursorAtOutput(main_win, "You must enter a 4-digit hex value. Try again. ");
                             rePromptHex = true;
                             continue;
                         }
@@ -670,7 +696,7 @@ void displayCPU(CPU_p *cpu, int memStart) {
                                 , breakPointStatus, memory[editAddress - ADDRESS_START]);
                         outputColCounter++;
                         //free(breakPointStatus); // BUG this causes a seg fault for some unknown reason.
-                        cursorAtOutput(main_win, "Done.");
+                        //cursorAtOutput(main_win, "Done.");
                         refresh();
                         break;
                     }
@@ -695,9 +721,10 @@ void displayCPU(CPU_p *cpu, int memStart) {
 void cursorAtPrompt(WINDOW *theWindow, char *theText) {
     if (!isHalted) {
          // First wipe out what ever is there.
-        mvwprintw(theWindow, 21, 1, "                                               ");
+        mvwprintw(theWindow, 21, 1, "                                                                                ");
     }
-    mvwprintw(theWindow, 22, 1, "-----------------------------------------------");
+    mvwprintw(theWindow, 22, 1, "--------------------------------------------------------------------------------");
+    refresh();
     mvwprintw(theWindow, 21, 1, theText); //The last place the cursor will sit.
     refresh();
 }
@@ -716,7 +743,7 @@ void cursorAtOutput(WINDOW *theWindow, char *theText) {
         text[0] = theText[i];
         mvwprintw(theWindow, OUTPUT_LINE_NUMBER + outputLineCounter, OUTPUT_COL_NUMBER + outputColCounter, text);
         outputColCounter++;
-        if (theText[i] == 10) {
+        if (theText[i] == 75) {
             outputLineCounter++;
             outputColCounter = 0;
         }
@@ -729,11 +756,12 @@ void cursorAtOutput(WINDOW *theWindow, char *theText) {
 void clearOutput(WINDOW *theWindow) {
     int i;
     mvwprintw(theWindow, OUTPUT_LINE_NUMBER, 1
-            , "Output                                                              ");
+            , "Output                                                                              ");
     for (i = 1; i <= OUTPUT_AREA_DEPTH; i++) {
-        mvwprintw(theWindow, OUTPUT_LINE_NUMBER + i, 2
-                , "                                                                    ");
+        mvwprintw(theWindow, OUTPUT_LINE_NUMBER + i, 1
+                , "                                                                                ");
     }
+    box(theWindow, 0, 0);
     refresh();
     outputLineCounter = 0;
 }
@@ -751,13 +779,14 @@ int hexCheck(char num[]) {
     int counter = 0;
     int valid = 0;
     int i;
+    int value = strtol(num, NULL, HEX_BITS);
 
     for (i = 0; i < 4; i++) {
         if (isxdigit(num[i])) {
             counter++;
         }
     }
-    if (counter == 4) {
+    if (counter == 4 && value >= ADDRESS_START && value <= MEMORY_SIZE) {
         return 1;
     } else {
         return 0;
@@ -797,25 +826,22 @@ void resetBreakPoints(unsigned char *array) {
  * Removes the junk from these memory locations.
  */
 CPU_p initialize() {
-    CPU_p cpu = { 0    // PC
-                , CONDITION_Z    // cc
-                , { 0, 0, 0, 0, 0, 0, 0, 0 }
-                , 0    // ir
-                , 0    // mar
-                , 0
-                , 0
-                , 0
-                , 0};  // mdr
+    CPU_p cpu = { 0           // pc
+                , CONDITION_Z // cc
+                , { {0,false}, {0,false}, {0,false}, {0,false}, {0,false}
+                    , {0,false}, {MEMORY_SIZE-ADDRESS_START,true}, {0,false}} // Registers 0-7.
+                , 0           // ir
+                , 0           // mar
+                , 0           // mdr
+                , 0           // alu.a
+                , 0};         // alu.b
 
     zeroOutMemory(memory);
     resetBreakPoints(breakPoint);
 
-    //zeroRegisters(cpu.reg);
-    int j;
-    for (j = 0; j < REGISTER_SIZE; j++) {
-        cpu.reg[j][0] = 0;
-        cpu.reg[j][1] = false;
-    }
+    // R6 is exclusively used as the stack pointer, and always contains memory address.
+    cpu.reg[REGISTER_6][0] = MEMORY_SIZE - ADDRESS_START;
+    cpu.reg[REGISTER_6][1] = true;
     return cpu;
 }
 

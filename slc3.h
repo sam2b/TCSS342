@@ -4,36 +4,33 @@
  *  Date Due: June 1, 2018
  *  Author:  Sam Brendel
  *  Final Project
- *  version: 5.28b
+ *  version: 5.29a
  */
 
 #include <stdio.h>
 #include <stdbool.h>
 #include <ncurses.h>
-//#include <curses.h>
 
 #ifndef SLC3_H_
 #define SLC3_H_
 
-#define MEMORY_SIZE       10000
-#define REGISTER_SIZE         8
-#define FILENAME_SIZE       200
-#define STRING_SIZE         200
-#define OUTPUT_LINE_NUMBER   24
-#define OUTPUT_COL_NUMBER     8
-#define OUTPUT_AREA_DEPTH     6
-#define ADDRESS_START      0x3000
-#define MAX_HEX_BITS          4
-#define HEX_BITS         16
-#define REGISTER_6            6 // Exclusively used for the stack.
-#define REGISTER_7            7
-#define WINDOW_WIDTH         86
-#define WINDOW_LEGTH         50
-#define COLUMN_LABEL_MEMORY  31
+#define MEMORY_SIZE       0xFFFF // Accounts for prompting the user for any 4-digit hex number.
+#define REGISTER_SIZE          8
+#define FILENAME_SIZE        200
+#define STRING_SIZE          200
+#define OUTPUT_LINE_NUMBER    24
+#define OUTPUT_COL_NUMBER      8
+#define OUTPUT_AREA_DEPTH      6
+#define ADDRESS_START       0x3000
+#define MAX_HEX_BITS           4
+#define HEX_BITS              16
+#define REGISTER_6             6 // Exclusively used for the stack.
+#define REGISTER_7             7
+#define WINDOW_WIDTH          82
+#define WINDOW_LEGTH          50
+#define COLUMN_LABEL_MEMORY   31
 #define COLUMN_LABEL_REGISTERS 1
-#define COLUMN_LABEL_TITLE 1
-#define TRUE 1
-#define FALSE 0
+#define COLUMN_LABEL_TITLE     1
 
 #define FETCH     0
 #define DECODE    1
@@ -58,7 +55,7 @@
 #define OP_JSRR  4 // 0100 0000 0000 0000
 #define OP_LEA  14 // 1110 0000 0000 0000
 #define OP_LDI  10 // 1010 0000 0000 0000
-#define OP_PP   13 // 1101 0000 0000 0000 Custom for stack push and pop.
+#define OP_PP   13 // 1101 0000 0000 0110 Custom for stack push and pop. R6 is the stack pointer.
 
 #define MASK_OPCODE               61440 // 1111 0000 0000 0000
 #define MASK_DR                    3584 // 0000 1110 0000 0000
@@ -79,6 +76,7 @@
 #define MASK_NEGATIVE_PCOFFSET11 0xF800 // 1111 1000 0000 0000
 #define MASK_NEGATIVE_PCOFFSET9  0xFE00 // 1111 1110 0000 0000
 #define MASK_NEGATIVE_PCOFFSET6  0xFFC0 // 1111 1111 1100 0000
+#define MASK_PP                       7 // 0000 0000 0000 0111
 
 #define CONDITION_N   4 // 0000 1000 0000 0000
 #define CONDITION_Z   2 // 0000 0100 0000 0000
@@ -119,7 +117,6 @@ struct CPUType {
     unsigned short int ir;     // instruction register.
     unsigned short mar;        // memory address register.
     unsigned short mdr;        // memory data register.
-    unsigned short microState;
     unsigned short A;
     unsigned short B;
 };
