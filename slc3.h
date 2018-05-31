@@ -4,7 +4,7 @@
  *  Date Due: June 1, 2018
  *  Author:  Sam Brendel
  *  Final Project
- *  version: 5.29a
+ *  version: 5.31a
  */
 
 #include <stdio.h>
@@ -24,6 +24,7 @@
 #define ADDRESS_START       0x3000
 #define MAX_HEX_BITS           4
 #define HEX_BITS              16
+#define REGISTER_5             5 // Can store the result from a sub routine.
 #define REGISTER_6             6 // Exclusively used for the stack.
 #define REGISTER_7             7
 #define WINDOW_WIDTH          82
@@ -31,6 +32,7 @@
 #define COLUMN_LABEL_MEMORY   31
 #define COLUMN_LABEL_REGISTERS 1
 #define COLUMN_LABEL_TITLE     1
+#define STACK_OFFSET_R0        8
 
 #define FETCH     0
 #define DECODE    1
@@ -127,6 +129,8 @@ bool isHalted = false;
 bool isRun = false;
 int outputLineCounter = 0;
 int outputColCounter = 0;
+int isPopped = 0;
+unsigned short *regRzeroPointer;
 
 bool  branchEnabled(unsigned short, CPU_p *);
 void  clearOutput(WINDOW *);
@@ -149,5 +153,8 @@ void  resetBreakPoints(unsigned char *);
 //void  zeroRegisters(unsigned short *[8][2]);
 unsigned short getCC(unsigned short);
 unsigned short ZEXT(unsigned short);
+void jsrStackPush(CPU_p *, unsigned short *);
+void jsrStackPop(CPU_p *, unsigned short *);
+void setPointer(CPU_p *, unsigned short *, unsigned short, bool, unsigned short *);
 
 #endif /* SLC3_H_ */
