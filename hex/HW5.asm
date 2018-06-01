@@ -23,7 +23,6 @@ GETNAME		GETC				; get first character from console. start of loop
 		OUT				; echo input to console
 		BRnzp GETNAME			; unconditional branch to start of loop for iteration
 		
-
 BREAK		OUT				; output newline character to console
 		LEA R1, STRING			; load address of string into R1
 		LEA R5, ENCRYPT			; Load R5 with address of encrypt subroutine
@@ -37,8 +36,7 @@ BREAK		OUT				; output newline character to console
 
 		HALT
 
-
-	; Encryption Subroutine 
+		; Encryption Subroutine 
 ENCRYPT		AND R4, R4, #0 			; Set R4 to zero	
 		ADD R4, R4, #3			; set R4 to constant 3, to subtract from chars
 		NOT R4, R4			; set R4 to negative 3
@@ -50,20 +48,15 @@ ENCLOOP		LDR R2, R1, #0			; load R2 with character from string
 		ADD R2, R2, R4			; subtract constant from character
 		STR R2, R1, #0			; store character in string.
 		ADD R1, R1, #1			; increment pointer
-		BRnzp ENCLOOP				; unconditional branch to start of encrypt loop
+		BRnzp ENCLOOP			; unconditional branch to start of encrypt loop
 
 ENCBREAK	LEA R0, STRING			; on success, load R0 with string address
 		RET				; return from subroutine.
 	
-
-
-
-
-	; Variable Storage
-NEWLINE		.FILL x0A			; ASCII value of newline
-STRING		.BLKW #20			; username string
-PROMPT1		.STRINGZ "Enter your name: "	; first prompt
+		; Variable Storage
+NEWLINE		.FILL x0A				; ASCII value of newline
+STRING		.BLKW #20				; username string
+PROMPT1		.STRINGZ "Enter your name: "		; first prompt
 PROMPT2		.STRINGZ "Press any key to continue..."	; prompt 2
-
 
 		.END

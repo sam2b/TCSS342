@@ -4,7 +4,7 @@
  *  Date Due: June 1, 2018
  *  Author:  Sam Brendel
  *  Final Project
- *  version: 5.31a
+ *  version: 5.31b
  */
 
 #include "slc3.h"
@@ -15,7 +15,6 @@
 #include <string.h>
 #include <ncurses.h>
 #include <ctype.h>
-
 
 // Represents system memory outside of the CPU.
 unsigned short memory[MEMORY_SIZE];
@@ -91,7 +90,7 @@ int controller(CPU_p *cpu, WINDOW *theWindow) {
     short offset, immed;
     unsigned short vector8, vector16;
     unsigned short *regDrPointer, *regSr1Pointer, *regSr2Pointer; // used for nested subroutines.
-    bool isCycleComplete = false, isStackEmpty = true;
+    bool isCycleComplete = false;
     unsigned short *stackPointer = (unsigned short *)cpu->reg[REGISTER_6];
 
     state = FETCH;
@@ -251,7 +250,7 @@ int controller(CPU_p *cpu, WINDOW *theWindow) {
                     case OP_ST:
                     case OP_STI:
                     case OP_STR: // Book page 124.
-                        cpu->mdr = *regDrPointer;
+                        cpu->mdr = cpu->reg[dr][0];//*regDrPointer;
                         break;
                     //case OP_RET:
                     case OP_JMP: // includes RET.
@@ -273,7 +272,6 @@ int controller(CPU_p *cpu, WINDOW *theWindow) {
                         cpu->reg[REGISTER_7][0] = cpu->pc;
                         cpu->reg[REGISTER_7][1] = true;
                         jsrStackPush(cpu, memory);
-                        isStackEmpty = false;
                         if (bit11 == 0) { //JSRR
                             sr1 = (cpu->ir & MASK_SR1) >> BITSHIFT_SR1;
                             //setPointer(cpu, regSr1Pointer, sr1, isPopped *stackPointer);
@@ -327,12 +325,6 @@ int controller(CPU_p *cpu, WINDOW *theWindow) {
                             memory[(*stackPointer)-1] = cpu->reg[0][0]; // store the result, but do NOT increment the stackPointer.
                             jsrStackPop(cpu, memory);
                             isPopped = 2;
-                            // If the stack is empty, then:
-                            if (*stackPointer == (MEMORY_SIZE - ADDRESS_START)) {
-                                isStackEmpty = true; // R0 is now the true R0 register.
-                            } else {
-                                isStackEmpty = false;  // Still need to access the indirect R0.
-                            }
                             cpu->pc = cpu->reg[REGISTER_7][0]; // Restore the PC.
                         }
                         break;
@@ -579,7 +571,7 @@ void displayCPU(CPU_p *cpu, int memStart) {
     isHalted = false;
     bool rePromptUser = true;
     bool rePromptHex = true;
-    char *fileName = malloc(FILENAME_SIZE * sizeof(char)); //char fileName[FILENAME_SIZE];
+    char *fileName; // = malloc(FILENAME_SIZE * sizeof(char)); //char fileName[FILENAME_SIZE];
     char breakPointMark;
     initscr();
     cbreak();
@@ -674,7 +666,7 @@ void displayCPU(CPU_p *cpu, int memStart) {
             clrtoeol();
             noecho();
 
-            //c = '3'; // TODO debugging, remove this line!
+            //c = '3'; // debugging within IDE.  Uncomment this line, and comment the entire next block.
             if (isRun && !isHalted && (breakPoint[cpu->pc] != '*')) {
                 c = '3'; // keep stepping until TRAP x25 is hit.
             } else {
@@ -696,6 +688,7 @@ void displayCPU(CPU_p *cpu, int memStart) {
                     isHalted = false;
                     cpu = &cpuTemp;
                     cursorAtPrompt(main_win, "Specify file name: ");
+                    fileName = malloc(FILENAME_SIZE * sizeof(char));
                     wgetstr(main_win, fileName);
                     loadProgramInstructions(openFileText(fileName, main_win), main_win);
                     free(fileName);
@@ -703,7 +696,12 @@ void displayCPU(CPU_p *cpu, int memStart) {
                     refresh();
                     break;
                 case '2': // Save
-                    printf(" ");
+                    cursorAtPrompt(main_win, "Type the filename to write to: ");
+                    fileName = malloc(FILENAME_SIZE * sizeof(char));
+                    cursorAtInput(main_win, fileName);
+                    wgetstr(main_win, fileName);
+                    writeToFile(main_win, fileName);
+                    free(fileName);
                     break;
                 case '3': // Step.
                     controller(cpu, main_win); // invoke exclusively in case 3.
@@ -833,7 +831,7 @@ void displayCPU(CPU_p *cpu, int memStart) {
                     exit(0);
                     break;
                 default:
-                    cursorAtPrompt(main_win, "---Invalid selection ");
+                    cursorAtPrompt(main_win, "---Invalid selection                                                             ");
                     rePromptUser = true;
                     break;
             }
@@ -845,7 +843,7 @@ void displayCPU(CPU_p *cpu, int memStart) {
 void cursorAtPrompt(WINDOW *theWindow, char *theText) {
     if (!isHalted) {
          // First wipe out what ever is there.
-        mvwprintw(theWindow, 21, 1, "                                                                                ");
+        mvwprintw(theWindow, 21, 1, "                                                                               ");
     }
     mvwprintw(theWindow, 22, 1, "--------------------------------------------------------------------------------");
     refresh();
@@ -935,6 +933,41 @@ void resetBreakPoints(unsigned char *array) {
     for (i = 0; i < MEMORY_SIZE; i++) {
         breakPoint[i] = ' ';
     }
+}
+
+void writeToFile(WINDOW *theWindow, char *fileName) {
+    FILE *outputFile, *outputFileLst;
+    char fileNameLst[FILENAME_SIZE] = "";
+    strcat(fileNameLst, fileName);
+    strcat(fileNameLst, ".lst");
+    strcat(fileName, ".hex");
+
+    // Check if file exists
+    outputFile = fopen(fileName, "r");
+    if(outputFile == NULL) {
+        outputFileLst = fopen(fileNameLst, "w+");
+        int i;
+        for(i = 0; i <= MEMORY_SIZE-ADDRESS_START; i++) {
+            fprintf(outputFileLst, "x%04X: ", (i+ADDRESS_START));
+            fprintf(outputFileLst, "x%04X", memory[i]);
+            fprintf(outputFileLst, "%c", '\n');
+            fflush(outputFileLst);
+        }
+        fclose(outputFileLst);
+
+        outputFile = fopen(fileName, "w+");
+        for(i = 0; i <= MEMORY_SIZE-ADDRESS_START; i++) {
+            fprintf(outputFile, "%04X", memory[i]);
+            fprintf(outputFile, "%c", '\n');
+            fflush(outputFile);
+        }
+        cursorAtPrompt(theWindow, "File written.                                                                    ");
+    } else {
+        // do nothing, and warn the user the file already exists.
+        // Perhaps prompt to overwrite, and handle appropriately.
+        cursorAtPrompt(theWindow, "File already exists. Not written.                                                ");
+    }
+    fclose(outputFile);
 }
 
 /*void zeroRegisters(unsigned short *array[8][2]) {

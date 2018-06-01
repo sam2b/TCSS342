@@ -14,14 +14,14 @@
 #ifndef SLC3_H_
 #define SLC3_H_
 
-#define MEMORY_SIZE       0xFFFF // Accounts for prompting the user for any 4-digit hex number.
+#define MEMORY_SIZE       0xFFFF //0x03E8 // 1000 lines, Displayed as x33E8
 #define REGISTER_SIZE          8
 #define FILENAME_SIZE        200
 #define STRING_SIZE          200
 #define OUTPUT_LINE_NUMBER    24
 #define OUTPUT_COL_NUMBER      8
 #define OUTPUT_AREA_DEPTH      6
-#define ADDRESS_START       0x3000
+#define ADDRESS_START     0x3000
 #define MAX_HEX_BITS           4
 #define HEX_BITS              16
 #define REGISTER_5             5 // Can store the result from a sub routine.
@@ -139,6 +139,7 @@ void  cursorAtPrompt(WINDOW *, char *);
 void  cursorAtInput(WINDOW *, char *);
 void  cursorAtOutput(WINDOW *, char *);
 void  cursorAtCustom(WINDOW *, int, int, char *);
+void  writeToFile(WINDOW *theWindow, char *);
 void  displayCPU(CPU_p *, int);
 void  displayHeader();
 int   hexCheck(char num[]);
@@ -156,5 +157,4 @@ unsigned short ZEXT(unsigned short);
 void jsrStackPush(CPU_p *, unsigned short *);
 void jsrStackPop(CPU_p *, unsigned short *);
 void setPointer(CPU_p *, unsigned short *, unsigned short, bool, unsigned short *);
-
 #endif /* SLC3_H_ */
