@@ -4,7 +4,7 @@
  *  Date Due: June 1, 2018
  *  Author:  Sam Brendel
  *  Final Project
- *  version: 5.31c
+ *  version: 5.31d
  */
 
 #include <stdio.h>
@@ -78,7 +78,7 @@
 #define MASK_NEGATIVE_PCOFFSET11 0xF800 // 1111 1000 0000 0000
 #define MASK_NEGATIVE_PCOFFSET9  0xFE00 // 1111 1110 0000 0000
 #define MASK_NEGATIVE_PCOFFSET6  0xFFC0 // 1111 1111 1100 0000
-#define MASK_PP                       7 // 0000 0000 0000 0111
+#define MASK_STACK_POINTER            7 // 0000 0000 0000 0111
 
 #define CONDITION_N   4 // 0000 1000 0000 0000
 #define CONDITION_Z   2 // 0000 0100 0000 0000
@@ -122,7 +122,6 @@ struct CPUType {
     unsigned short A;
     unsigned short B;
 };
-
 typedef struct CPUType CPU_p;
 
 bool isHalted = false;
@@ -142,6 +141,7 @@ void  cursorAtOutput(WINDOW *, char *);
 void  cursorAtCustom(WINDOW *, int, int, char *);
 void  writeToFile(WINDOW *theWindow, char *);
 void  displayCPU(CPU_p *, int);
+void  stackPush(CPU_p *);
 void  displayHeader();
 int   hexCheck(char num[]);
 int   hexCheckAddress(char num[]);
@@ -159,4 +159,5 @@ unsigned short ZEXT(unsigned short);
 void jsrStackPush(CPU_p *, unsigned short *);
 void jsrStackPop(CPU_p *, unsigned short *);
 void setPointer(CPU_p *, unsigned short *, unsigned short, bool, unsigned short *);
+
 #endif /* SLC3_H_ */

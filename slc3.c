@@ -4,7 +4,7 @@
  *  Date Due: June 1, 2018
  *  Author:  Sam Brendel
  *  Final Project
- *  version: 5.31c
+ *  version: 5.31d
  */
 
 #include "slc3.h"
@@ -162,12 +162,14 @@ int controller(CPU_p *cpu, WINDOW *theWindow) {
                     case OP_LD:
                         dr       = (cpu->ir     & MASK_DR) >> BITSHIFT_DR;
                         offset   = sext(cpu->ir & MASK_PCOFFSET9, BIT_PCOFFSET9);
+                        cpu->A   = cpu->pc;
+                        cpu->B   = offset;
                         cpu->mar = cpu->pc + offset; // microstate 2.
                         cpu->mdr = memory[cpu->mar]; // microstate 25.
                         break;
                     case OP_LDR:
-                        dr       = (cpu->ir      & MASK_DR)  >> BITSHIFT_DR;
-                        sr1      = (cpu->ir      & MASK_SR1) >> BITSHIFT_SR1;
+                        dr  = (cpu->ir      & MASK_DR)  >> BITSHIFT_DR;
+                        sr1 = (cpu->ir      & MASK_SR1) >> BITSHIFT_SR1;
                         //setPointer(cpu, regSr1Pointer, sr1, isPopped *stackPointer);
                         // Account for nested subroutines using their own R0 has a returned result.
                         if (sr1 == 0 && isPopped) {
@@ -175,26 +177,32 @@ int controller(CPU_p *cpu, WINDOW *theWindow) {
                         } else {
                             regSr1Pointer = (unsigned short *)cpu->reg[sr1]; //regPointer = (unsigned short *)cpu->reg[reg];
                         }
-                        offset   = sext(cpu->ir  & MASK_PCOFFSET6, BIT_PCOFFSET6);
+                        offset = sext(cpu->ir  & MASK_PCOFFSET6, BIT_PCOFFSET6);
                         //setPointer(cpu, regSr1Pointer, sr1, isPopped *stackPointer);
+                        cpu->A   = cpu->pc;
+                        cpu->B   = offset;
                         cpu->mar = *regSr1Pointer + offset;
                         cpu->mdr = memory[cpu->mar];
                         break;
                     case OP_LDI:
                         dr       = (cpu->ir     & MASK_DR) >> BITSHIFT_DR;
                         offset   = sext(cpu->ir & MASK_PCOFFSET9, BIT_PCOFFSET9);
+                        cpu->A   = cpu->pc;
+                        cpu->B   = offset;
                         cpu->mar = cpu->pc + offset; // microstate 2.
                         cpu->mdr = memory[memory[cpu->mar] - ADDRESS_START]; // microstate 25.
                         break;
                     case OP_ST:
                     case OP_STI: // Same as ST.
-                        dr       = (cpu->ir     & MASK_DR) >> BITSHIFT_DR; // Actually a source register, but still use dr.
-                        offset   = sext(cpu->ir & MASK_PCOFFSET9, BIT_PCOFFSET9);
+                        dr     = (cpu->ir     & MASK_DR) >> BITSHIFT_DR; // Actually a source register, but still use dr.
+                        offset = sext(cpu->ir & MASK_PCOFFSET9, BIT_PCOFFSET9);
+                        cpu->A = cpu->pc;
+                        cpu->B = offset;
                         cpu->mar = cpu->pc + offset; // microstate 2.
                         break;
                     case OP_STR:
-                        dr       = (cpu->ir      & MASK_DR)  >> BITSHIFT_DR;  // Actually source register.
-                        sr1      = (cpu->ir      & MASK_SR1) >> BITSHIFT_SR1; // Base register.
+                        dr  = (cpu->ir      & MASK_DR)  >> BITSHIFT_DR;  // Actually source register.
+                        sr1 = (cpu->ir      & MASK_SR1) >> BITSHIFT_SR1; // Base register.
                         //setPointer(cpu, regSr1Pointer, sr1, isPopped *stackPointer);
                         // Account for nested subroutines using their own R0 has a returned result.
                         if (sr1 == 0 && isPopped) {
@@ -202,13 +210,15 @@ int controller(CPU_p *cpu, WINDOW *theWindow) {
                         } else {
                             regSr1Pointer = (unsigned short *)cpu->reg[sr1]; //regPointer = (unsigned short *)cpu->reg[reg];
                         }
-                        offset   = sext(cpu->ir  & MASK_PCOFFSET6, BIT_PCOFFSET6);
+                        offset = sext(cpu->ir  & MASK_PCOFFSET6, BIT_PCOFFSET6);
                         //setPointer(cpu, regSr1Pointer, sr1, isPopped *stackPointer);
+                        cpu->A = *regSr1Pointer;
+                        cpu->B = offset;
                         cpu->mar = *regSr1Pointer + offset;
                         break;
                     case OP_LEA:
-                        dr       = (cpu->ir & MASK_DR) >> BITSHIFT_DR;
-                        offset   = sext(cpu->ir  & MASK_PCOFFSET9, BIT_PCOFFSET9);
+                        dr     = (cpu->ir & MASK_DR) >> BITSHIFT_DR;
+                        offset = sext(cpu->ir  & MASK_PCOFFSET9, BIT_PCOFFSET9);
                         break;
                     case OP_JSR: // includes JSRR.
                         // R5 is expected to contain the result from a subroutine.
@@ -219,7 +229,6 @@ int controller(CPU_p *cpu, WINDOW *theWindow) {
                         // The stack shall begin at the last element in memory[].
                         // The first stack item begins at one element before the last element.
                         bit5 = (cpu->ir & MASK_BIT5) >> BITSHIFT_BIT5;
-                        *stackPointer = cpu->ir & MASK_PP; // TODO is this a problem?
                         if (bit5 == 0) {
                             // Push.
                             sr1 = (cpu->ir & MASK_SR1) >> BITSHIFT_SR1;
@@ -283,6 +292,8 @@ int controller(CPU_p *cpu, WINDOW *theWindow) {
                             }
                             cpu->pc = *regSr1Pointer;
                         } else { //JSR
+                            cpu->A = cpu->pc;
+                            cpu->B = offset;
                             cpu->pc += offset;
                         }
                         break;
@@ -294,17 +305,23 @@ int controller(CPU_p *cpu, WINDOW *theWindow) {
                 //printf("Now in EXECUTE---------------\n");
                 switch (opcode) {
                     case OP_ADD:
+                        cpu->A = *regSr1Pointer;
                         if (bit5 == 0) {
+                            cpu->B = *regSr2Pointer;
                             cpu->mdr = (*regSr2Pointer + *regSr1Pointer);
                         } else if (bit5 == 1) {
+                            cpu->B = immed;
                             cpu->mdr = *regSr1Pointer + immed;
                         }
                         cpu->cc = getCC(cpu->mdr);
                         break;
                     case OP_AND:
+                        cpu->A = *regSr1Pointer;
                         if (bit5 == 0) {
+                            cpu->B = *regSr2Pointer;
                             cpu->mdr = *regSr2Pointer & *regSr1Pointer;
                         } else if (bit5 == 1) {
+                            cpu->B = immed;
                             cpu->mdr = *regSr1Pointer & immed;
                         }
                         cpu->cc = getCC(cpu->mdr);
@@ -331,19 +348,20 @@ int controller(CPU_p *cpu, WINDOW *theWindow) {
                     case OP_BR:
                         offset = sext(offset, BIT_PCOFFSET9);
                         if (branchEnabled(nzp, cpu)) {
+                            cpu->A = cpu->pc;
+                            cpu->B = offset;
                             cpu->pc += (offset);
                         }
                         break;
                     case OP_PP:
                         if (bit5 == 0) {
-                            // Push.
-                            cpu->reg[REGISTER_6][0]--; // Grow the stack.
+                            //stackPush(cpu);
                             // Store phase does the write-back into memory.
                         } else {
                             // Pop.
-                            cpu->reg[dr][0] = memory[cpu->reg[*stackPointer][0]];
                             if (*stackPointer < (MEMORY_SIZE-ADDRESS_START)) {
-                                (*stackPointer)++; // Shrink the stack.
+                                cpu->reg[dr][0] = memory[*stackPointer];
+                                (*stackPointer)++;
                                 // Do not increment when the stack is empty.
                             } else {
                                 cursorAtOutput(theWindow, "Error: cannot pop an empty stack.");
@@ -380,6 +398,8 @@ int controller(CPU_p *cpu, WINDOW *theWindow) {
                         memory[cpu->mar] = cpu->mdr; // Store into memory.
                         break;
                     case OP_LEA:
+                        cpu->A = cpu->pc;
+                        cpu->B = offset;
                         cpu->reg[dr][0] = cpu->pc + offset;
                         cpu->reg[dr][1] = true;
                         cpu->cc = getCC(cpu->reg[dr][0]);
@@ -390,6 +410,7 @@ int controller(CPU_p *cpu, WINDOW *theWindow) {
                         // The first stack item begins at one element before 0xFFFF.
                         if (bit5 == 0) {
                             // Push onto the stack.
+                            (*stackPointer)--;
                             memory[cpu->reg[REGISTER_6][0]] = cpu->reg[sr1][0];
                         }
                         break;
@@ -430,16 +451,24 @@ int controller(CPU_p *cpu, WINDOW *theWindow) {
  */
 void jsrStackPush(CPU_p *cpu, unsigned short *mem) {
     // A one-time increment when the stack is empty.
-    if (cpu->reg[REGISTER_6][0] == (MEMORY_SIZE - ADDRESS_START - 1)) {
-        cpu->reg[REGISTER_6][0]++;
-    }
+    /*if (cpu->reg[REGISTER_6][0] == (MEMORY_SIZE - ADDRESS_START - 1)) {
+        cpu->reg[REGISTER_6][0]++; // SHOULD NOT BE ++
+    }*/
+    //stackPush(cpu);
 
     int i;
     for(i=0; i<=REGISTER_7; i++) {
-        memory[cpu->reg[REGISTER_6][0]] = cpu->reg[i][0];
         cpu->reg[REGISTER_6][0]--;
+        memory[cpu->reg[REGISTER_6][0]] = cpu->reg[i][0];
     }
 }
+
+/*void stackPush(CPU_p *cpu) {
+    // A one-time increment when the stack is empty.
+    if (cpu->reg[REGISTER_6][0] == (MEMORY_SIZE - ADDRESS_START)) { //(MEMORY_SIZE - ADDRESS_START - 1)
+        cpu->reg[REGISTER_6][0]--;
+    }
+}*/
 
 /**
  * Restores R0..R7 and PC.
@@ -450,13 +479,14 @@ void jsrStackPush(CPU_p *cpu, unsigned short *mem) {
 void jsrStackPop(CPU_p *cpu, unsigned short *mem) {
     int i;
     for(i=REGISTER_7; i>=0; i--) {
-        cpu->reg[REGISTER_6][0]++;
         if (i != REGISTER_6) {
             cpu->reg[i][0] = memory[cpu->reg[REGISTER_6][0]];
             // Do not overwrite R6.
         }
+        cpu->reg[REGISTER_6][0]++;
     }
 }
+
 
 /**
  * Sets the condition code resulting by the resulting computer value.
@@ -614,13 +644,13 @@ void displayCPU(CPU_p *cpu, int memStart) {
         }
 
         // Next 4 lines of Registers and Memory.
-        mvwprintw(main_win, 14, 1, "PC:  x%04X    IR: x%04X  %c x%04X: x%04X"
+        mvwprintw(main_win, 14, 1, " PC: x%04X    IR: x%04X  %c x%04X: x%04X"
                 , cpu->pc+ADDRESS_START
                 , cpu->ir, breakPoint[i+(memStart-ADDRESS_START)]
                 , i+memStart
                 , memory[i+(memStart-ADDRESS_START)]);
         i++;
-        mvwprintw(main_win, 15, 1, "A:   x%04X     B: x%04X  %c x%04X: x%04X"
+        mvwprintw(main_win, 15, 1, "  A: x%04X     B: x%04X  %c x%04X: x%04X"
                 , cpu->A, cpu->B, breakPoint[i+(memStart-ADDRESS_START)], i+memStart, memory[i+(memStart-ADDRESS_START)]);
         i++;
         mvwprintw(main_win, 16, 1, "MAR: x%04X   MDR: x%04X  %c x%04X: x%04X"
@@ -629,7 +659,7 @@ void displayCPU(CPU_p *cpu, int memStart) {
                 , i+memStart
                 , memory[i+(memStart-ADDRESS_START)]);
         i++;
-        mvwprintw(main_win, 17, 1, "CC:  N:%d Z:%d P:%d         %c x%04X: x%04X",
+        mvwprintw(main_win, 17, 1, " CC: N:%d Z:%d P:%d         %c x%04X: x%04X",
                   (cpu->cc >> BITSHIFT_CC_BIT3) & MASK_CC_N
                 , (cpu->cc >> BITSHIFT_CC_BIT2) & MASK_CC_Z
                 , cpu->cc  & MASK_CC_P
