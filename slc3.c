@@ -4,7 +4,7 @@
  *  Date Due: June 1, 2018
  *  Author:  Sam Brendel
  *  Final Project
- *  version: 5.31b
+ *  version: 5.31c
  */
 
 #include "slc3.h"
@@ -673,13 +673,14 @@ void displayCPU(CPU_p *cpu, int memStart) {
                 isRun = false;
                 if (breakPoint[cpu->pc] == '*') {
                     cursorAtPrompt(main_win, "Press Step to proceed.");
+                    box(main_win, 0, 0);
                     refresh();
                 }
                 c = wgetch(main_win); // This is what stops to prompt the user for an Option input.
             }
 
             echo();
-            box(main_win, 0, 0);
+            box(main_win, 0, 0); // Do not remove this line, else display anomalies happen.
             refresh();
             switch(c){
                 case '1': // Load.
@@ -698,7 +699,6 @@ void displayCPU(CPU_p *cpu, int memStart) {
                 case '2': // Save
                     cursorAtPrompt(main_win, "Type the filename to write to: ");
                     fileName = malloc(FILENAME_SIZE * sizeof(char));
-                    cursorAtInput(main_win, fileName);
                     wgetstr(main_win, fileName);
                     writeToFile(main_win, fileName);
                     free(fileName);
@@ -707,70 +707,85 @@ void displayCPU(CPU_p *cpu, int memStart) {
                     controller(cpu, main_win); // invoke exclusively in case 3.
                     break;
                 case '5': // DisplayMem.
+                    clearOutput(main_win);
                     while (rePromptHex) {
+                        clearPrompt(main_win);
+                       box(main_win, 0, 0);
                         char inputMemAddress[4];
                         int newStart = 0;
                         //mvwprintw(main_win, 21, 1, "Push Q to return to main menu.");
                         //mvwprintw(main_win, 22, 1, "New Starting Address: x");
                         cursorAtPrompt(main_win, "New Starting Address: ");
+                        refresh();
                         wgetstr(main_win, inputMemAddress);
                         box(main_win, 0, 0);
                         refresh();
                         if (inputMemAddress[0] == 'q' || inputMemAddress[0] == 'Q') {
-                            cursorAtPrompt(main_win, "");
+                            cursorAtPrompt(main_win, "                                                                                ");
                             //rePromptUser = true;
                             break;
                         }
-                        if (hexCheck(inputMemAddress)) {
+                        if (hexCheckAddress(inputMemAddress)) {
                             newStart = strtol(inputMemAddress, NULL, HEX_BITS);
                             displayCPU(cpu, newStart);
                             break;
                         } else {
-                            cursorAtOutput(main_win, "You must enter a 4-digit hex value. Try again. ");
+                            clearOutput(main_win);
+                            cursorAtOutput(main_win, "You must enter a 4-digit hex value. Try again.");
                             continue;
                         }
                     }
+                    clearPrompt(main_win);
+                    //clearOutput(main_win);
                     rePromptHex = true;
                     break;
                 case '6': // Edit.
                     clearOutput(main_win);
                     while (rePromptHex) {
+                        clearPrompt(main_win);
+                        box(main_win, 0, 0);
                         char inputMemAddress[4], inputMemValue[4];
                         int editAddress = 0, editValue = 0;
                         cursorAtPrompt(main_win, "Edit Memory Address: ");
                         wgetstr(main_win, inputMemAddress);
                         refresh();
                         if (inputMemAddress[0] == 'q' || inputMemAddress[0] == 'Q') {
-                            cursorAtPrompt(main_win, "");
+                            cursorAtPrompt(main_win, "                                                                                ");
                             rePromptUser = true;
                             break;
                         }
                         if (hexCheck(inputMemAddress)) {
                             editAddress = strtol(inputMemAddress, NULL, HEX_BITS);
                         } else {
-                            cursorAtOutput(main_win, "You must enter a 4-digit hex value. Try again. ");
+                            clearOutput(main_win);
+                            cursorAtOutput(main_win, "You must enter a 4-digit hex value. Try again.");
                             rePromptHex = true;
                             continue;
                         }
 
+                        clearOutput(main_win);
                         mvwprintw(main_win, OUTPUT_LINE_NUMBER, OUTPUT_COL_NUMBER, "Old value for address: x%04X"
                                 , memory[editAddress - ADDRESS_START]);
                         outputColCounter++;
                         //cursorAtOutput(main_win, "Old value for address: blah");
+                        clearPrompt(main_win);
                         cursorAtPrompt(main_win, "Enter new hex value: ");
                         refresh();
                         wgetstr(main_win, inputMemValue);
                         if (inputMemValue[0] == 'q' || inputMemValue[0] == 'Q') {
-                            cursorAtPrompt(main_win, "");
+                            //cursorAtPrompt(main_win, "                                                                                ");
                             break;
                         }
                         if (hexCheck(inputMemValue)) {
                             editValue = strtol(inputMemValue, NULL, HEX_BITS);
                         } else {
-                            cursorAtOutput(main_win, "You must enter a 4-digit hex value. Try again. ");
+                            clearOutput(main_win);
+                            cursorAtOutput(main_win, "You must enter a 4-digit hex value. Try again.");
                             clearOutput(main_win);
                             continue;
                         }
+                        clearPrompt(main_win);
+                        clearOutput(main_win);
                         memory[editAddress - ADDRESS_START] = editValue;
                         //cursorAtOutput(main_win, "Done.");
                         refresh();
@@ -784,6 +799,7 @@ void displayCPU(CPU_p *cpu, int memStart) {
                 case '8': // Break Point.
                     clearOutput(main_win);
                     while (rePromptHex) {
+                        box(main_win, 0, 0);
                         char inputMemAddress[4];
                         int editAddress = 0;
                         char *breakPointStatus = (char*) malloc(sizeof(char) * 3);
@@ -791,14 +807,15 @@ void displayCPU(CPU_p *cpu, int memStart) {
                         wgetstr(main_win, inputMemAddress);
                         refresh();
                         if (inputMemAddress[0] == 'q' || inputMemAddress[0] == 'Q') {
-                            cursorAtPrompt(main_win, "");
+                            cursorAtPrompt(main_win, "                                                                                ");
                             rePromptUser = true;
                             break;
                         }
-                        if (hexCheck(inputMemAddress)) {
+                        if (hexCheckAddress(inputMemAddress)) {
                             editAddress = strtol(inputMemAddress, NULL, HEX_BITS);
                         } else {
-                            cursorAtOutput(main_win, "You must enter a 4-digit hex value. Try again. ");
+                            clearOutput(main_win);
+                            cursorAtOutput(main_win, "You must enter a 4-digit hex value. Try again.");
                             rePromptHex = true;
                             continue;
                         }
@@ -832,6 +849,8 @@ void displayCPU(CPU_p *cpu, int memStart) {
                     break;
                 default:
                     cursorAtPrompt(main_win, "---Invalid selection                                                             ");
+                    box(main_win, 0, 0);
+                    refresh();
                     rePromptUser = true;
                     break;
             }
@@ -849,6 +868,13 @@ void cursorAtPrompt(WINDOW *theWindow, char *theText) {
     refresh();
     mvwprintw(theWindow, 21, 1, theText); //The last place the cursor will sit.
     refresh();
+}
+
+void clearPrompt(WINDOW *theWindow) {
+    mvwprintw(theWindow, 21, 1, "                                                                               ");
+    mvwprintw(theWindow, 22, 1, "--------------------------------------------------------------------------------");
+    refresh();
+    wrefresh(theWindow);
 }
 
 void cursorAtInput(WINDOW *theWindow, char *theText) {
@@ -886,6 +912,7 @@ void clearOutput(WINDOW *theWindow) {
     box(theWindow, 0, 0);
     refresh();
     outputLineCounter = 0;
+    outputColCounter = 0;
 }
 
 void cursorAtCustom(WINDOW *theWindow, int theRow, int theColumn, char *theText) {
@@ -894,7 +921,28 @@ void cursorAtCustom(WINDOW *theWindow, int theRow, int theColumn, char *theText)
 }
 
 /**
- * A function to check the validity of a hex number.
+ * Validites of a hex number of a memory address.
+ * Returns 1 if true, 0 if false.
+ */
+int hexCheckAddress(char num[]) {
+    int counter = 0;
+    int valid = 0;
+    int i;
+    int value = strtol(num, NULL, HEX_BITS);
+    for (i = 0; i < 4; i++) {
+        if (isxdigit(num[i])) {
+            counter++;
+        }
+    }
+    if (counter == 4 && value >= ADDRESS_START && value <= MEMORY_SIZE) {
+        return 1;
+    } else {
+        return 0;
+    }
+}
+
+/**
+ * Validites of a hex number.
  * Returns 1 if true, 0 if false.
  */
 int hexCheck(char num[]) {
@@ -902,13 +950,12 @@ int hexCheck(char num[]) {
     int valid = 0;
     int i;
     int value = strtol(num, NULL, HEX_BITS);
-
     for (i = 0; i < 4; i++) {
         if (isxdigit(num[i])) {
             counter++;
         }
     }
-    if (counter == 4 && value >= ADDRESS_START && value <= MEMORY_SIZE) {
+    if (counter == 4) {
         return 1;
     } else {
         return 0;
@@ -961,12 +1008,13 @@ void writeToFile(WINDOW *theWindow, char *fileName) {
             fprintf(outputFile, "%c", '\n');
             fflush(outputFile);
         }
-        cursorAtPrompt(theWindow, "File written.                                                                    ");
+        cursorAtPrompt(theWindow, "File written.                                                                   ");
     } else {
         // do nothing, and warn the user the file already exists.
         // Perhaps prompt to overwrite, and handle appropriately.
-        cursorAtPrompt(theWindow, "File already exists. Not written.                                                ");
+        cursorAtPrompt(theWindow, "File already exists. Not written.                                               ");
     }
+    refresh();
     fclose(outputFile);
 }
 

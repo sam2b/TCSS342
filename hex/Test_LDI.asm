@@ -12,6 +12,6 @@
 
 	HALT		; Stop this program now.
 
-DATA	.FILL x3010
+DATA	.FILL x300F
 
 	.end		; End of program

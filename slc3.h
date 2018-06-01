@@ -4,7 +4,7 @@
  *  Date Due: June 1, 2018
  *  Author:  Sam Brendel
  *  Final Project
- *  version: 5.31a
+ *  version: 5.31c
  */
 
 #include <stdio.h>
@@ -134,6 +134,7 @@ unsigned short *regRzeroPointer;
 
 bool  branchEnabled(unsigned short, CPU_p *);
 void  clearOutput(WINDOW *);
+void  clearPrompt(WINDOW *);
 int   controller(CPU_p *, WINDOW *);
 void  cursorAtPrompt(WINDOW *, char *);
 void  cursorAtInput(WINDOW *, char *);
@@ -143,6 +144,7 @@ void  writeToFile(WINDOW *theWindow, char *);
 void  displayCPU(CPU_p *, int);
 void  displayHeader();
 int   hexCheck(char num[]);
+int   hexCheckAddress(char num[]);
 CPU_p initialize();
 void  loadProgramInstructions(FILE *, WINDOW *);
 FILE* openFileText(char *, WINDOW *);
